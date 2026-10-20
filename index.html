@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Registro Inercial Unificado (200ms + Pasos)</title>
+<title>Registro Inercial Unificado (50ms + Pasos)</title>
 <style>
   :root { color-scheme: dark; }
   body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: #0d1117; color: #e6edf3; }
@@ -44,7 +44,7 @@
 </head>
 <body>
 <main>
-  <h1>Registro Unificado (Muestreo 200 ms + Detección de Pasos)</h1>
+  <h1>Registro Unificado (Muestreo 50 ms + Detección de Pasos)</h1>
 
   <!-- Dashboard -->
   <div class="grid">
@@ -85,7 +85,7 @@
   <canvas id="map"></canvas>
 
   <!-- Tabla Unificada -->
-  <h2 id="table-title">Registro General [--------:------] (Cada 200 ms + Match de Paso)</h2>
+  <h2 id="table-title">Registro General [--------:------] (Cada 50 ms + Match de Paso)</h2>
   <div class="table-container">
     <table>
       <thead>
@@ -107,7 +107,7 @@
   </div>
 
   <p class="note">
-    <strong>Nota:</strong> El sistema realiza un muestreo independiente cada 200 ms guardando el estado actual de los sensores. Si en ese intervalo ocurre una zancada, la columna <strong>Paso Match</strong> registra el número de paso correspondiente; de lo contrario, se mantiene vacía.
+    <strong>Nota:</strong> El sistema realiza un muestreo independiente cada <strong>50 ms</strong> guardando el estado actual de los sensores. Si en ese intervalo ocurre una zancada, la columna <strong>Paso Match</strong> registra el número de paso correspondiente.
   </p>
 </main>
 
@@ -116,13 +116,12 @@ const $ = id => document.getElementById(id);
 const canvas = $('map'), ctx = canvas.getContext('2d');
 
 let running = false;
-let records = [];         // Almacena todos los registros de 200 ms
-let stepCounter = 0;
+let records = [];         
 let totalSteps = 0;
 
 let sessionStartTimestamp = null;
 let sessionStartMs = 0;
-let sampleInterval = null; // Timer para los 200 ms
+let sampleInterval = null; // Timer configurado a 50 ms
 
 let lastPeakTime = 0;
 let lastMagnitude = 9.81;
@@ -163,7 +162,7 @@ function startListening() {
   sessionStartTimestamp = formatSessionDate(now);
   sessionStartMs = performance.now();
 
-  $('table-title').textContent = `Registro General [${sessionStartTimestamp}] (Cada 200 ms + Match de Paso)`;
+  $('table-title').textContent = `Registro General [${sessionStartTimestamp}] (Cada 50 ms + Match de Paso)`;
 
   window.addEventListener('devicemotion', onMotion);
   window.addEventListener('deviceorientation', onOrientation);
@@ -176,8 +175,8 @@ function startListening() {
   $('stopBtn').disabled = false;
   $('exportBtn').disabled = false;
 
-  // Iniciar el registro independiente cada 200 ms
-  sampleInterval = setInterval(recordSampleData, 200);
+  // Iniciar el registro independiente cada 50 ms
+  sampleInterval = setInterval(recordSampleData, 50);
 }
 
 function stopListening() {
@@ -234,7 +233,6 @@ function onMotion(event) {
   detectStep(t, magnitude);
 }
 
-// Bandera temporal para indicar si en este ciclo de 200ms ocurrió un paso
 let stepOccurredInCycle = null;
 
 function detectStep(t, magnitude) {
@@ -277,7 +275,7 @@ function detectStep(t, magnitude) {
   lastMagnitude = magnitude;
 }
 
-// Función ejecutada cada 200 ms de forma independiente
+// Función ejecutada cada 50 ms de forma independiente
 function recordSampleData() {
   const elapsedMs = Math.round(performance.now() - sessionStartMs);
   
@@ -297,11 +295,9 @@ function recordSampleData() {
   records.push(record);
   addRow(record);
 
-  // Limpiar la bandera de paso para el siguiente intervalo de 200ms
   stepOccurredInCycle = null;
 }
 
-// Evaluar si se detuvo tras 1.8 segundos sin pasos
 setInterval(() => {
   if (running && lastPeakTime > 0 && (performance.now() - lastPeakTime) > 1800) {
     $('state-val').textContent = 'Detenido 🛑';
@@ -326,8 +322,8 @@ function addRow(r) {
   `;
   tbody.prepend(tr);
 
-  // Limitar visualización en tabla a los últimos 100 registros para no sobrecargar el DOM
-  if (tbody.children.length > 100) {
+  // Mantener un límite visible en la tabla para optimizar rendimiento de renderizado en DOM
+  if (tbody.children.length > 150) {
     tbody.lastChild.remove();
   }
 }
@@ -366,7 +362,6 @@ function drawMap() {
   ctx.font = '12px system-ui';
   ctx.fillText('N', displayWidth - 34, 15);
 
-  // Reconstruir la ruta basada en los pasos detectados guardados en los registros
   const stepRecords = records.filter(r => r.stepMatch !== '');
   
   if (stepRecords.length === 0) {
@@ -375,16 +370,13 @@ function drawMap() {
     return;
   }
 
-  // Recalcular posiciones X, Y para graficar
   let trackX = 0, trackY = 0;
   ctx.strokeStyle = '#38bdf8';
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(px(0), py(0));
 
-  // Asignar zancadas aproximadas para el mapa
   stepRecords.forEach(sr => {
-    // Estimación visual basada en los pasos guardados
     trackX += 0.75 * Math.sin(parseFloat(sr.heading || 0) * Math.PI / 180);
     trackY += 0.75 * Math.cos(parseFloat(sr.heading || 0) * Math.PI / 180);
     ctx.lineTo(px(trackX), py(trackY));
@@ -419,7 +411,6 @@ function resetAll() {
   stopListening();
   records = [];
   totalSteps = 0;
-  stepCounter = 0;
   x = y = 0;
   minX = -1; maxX = 1; minY = -1; maxY = 1;
   sessionStartTimestamp = null;
@@ -427,7 +418,7 @@ function resetAll() {
   
   $('step-count').textContent = '0';$('state-val').textContent = 'Detenido';
   $('state-val').className = 'value warning';$('stride-val').textContent = '0.750 m';
-  $('table-title').textContent = 'Registro General [--------:------] (Cada 200 ms + Match de Paso)';$('log').innerHTML = '';
+  $('table-title').textContent = 'Registro General [--------:------] (Cada 50 ms + Match de Paso)';$('log').innerHTML = '';
   drawMap();
 }
 
