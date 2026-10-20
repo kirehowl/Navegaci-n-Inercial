@@ -3,55 +3,115 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Registro de pasos, sensores y trayectoria</title>
+<title>Registro de pasos, sensores, PDR y trayectoria</title>
 <style>
   :root { color-scheme: dark; }
-  body { font-family: system-ui, sans-serif; margin: 0; background: #0d1117; color: #e6edf3; }
+  body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: #0d1117; color: #e6edf3; }
   main { padding: 16px; max-width: 900px; margin: auto; }
-  h1 { font-size: 1.25rem; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-  .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 12px; }
+  h1 { font-size: 1.25rem; text-align: center; color: #38bdf8; margin-bottom: 16px; }
+  h2 { font-size: 1.05rem; border-bottom: 1px solid #30363d; padding-bottom: 6px; margin-top: 16px; color: #7dd3fc; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
   .label { font-size: .75rem; color: #8b949e; }
-  .value { font-size: 1.15rem; font-weight: 700; }
-  button { border: 0; border-radius: 8px; padding: 10px 14px; font-weight: 700; cursor: pointer; }
+  .value { font-size: 1.15rem; font-weight: 700; color: #38bdf8; }
+  .highlight { color: #4ade80; }
+  .warning { color: #f59e0b; }
+  button { border: 0; border-radius: 8px; padding: 10px 14px; font-weight: 700; cursor: pointer; width: 100%; margin-top: 8px; font-size: 0.85rem; }
   .start { background: #238636; color: white; }
+  .start:active { background: #196c2e; }
   .stop { background: #da3633; color: white; }
+  .stop:active { background: #b32a28; }
   .export { background: #1f6feb; color: white; }
-  canvas { width: 100%; height: 380px; background: #010409; border: 1px solid #30363d; border-radius: 10px; }
-  input { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: #e6edf3; }
-  table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+  .export:active { background: #1158c7; }
+  .toggle { background: #d97706; color: white; }
+  .toggle.active { background: #238636; }
+  .reset { background: #dc2626; color: white; }
+  .reset:active { background: #b91c1c; }
+  canvas { width: 100%; height: 320px; background: #010409; border: 1px solid #30363d; border-radius: 10px; margin-top: 8px; }
+  input { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: #e6edf3; box-sizing: border-box; }
+  table { width: 100%; border-collapse: collapse; font-size: .78rem; font-family: monospace; }
   th, td { border-bottom: 1px solid #21262d; padding: 5px; text-align: right; }
   th:first-child, td:first-child { text-align: left; }
-  .note { color: #8b949e; font-size: .82rem; }
+  .note { color: #8b949e; font-size: .82rem; margin-top: 10px; }
+  .log-container { font-size: 0.75rem; color: #cbd5e1; background-color: #010409; border-radius: 6px; padding: 8px; max-height: 110px; overflow-y: auto; margin-top: 8px; font-family: monospace; border: 1px solid #30363d; }
+  .btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+  .btn-group button { width: auto; flex: 1; }
+  .data-row { display: flex; justify-content: space-between; margin: 6px 0; font-family: monospace; font-size: 0.9rem; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Registro de pasos, sensores IMU y trayectoria</h1>
+  <h1>Navegación Inercial, PDR & Sensores</h1>
 
+  <!-- Botón General de Control Global -->
+  <button class="reset" onclick="resetTest()" style="padding: 12px; font-size: 1rem; margin-bottom: 12px;">🔄 Reiniciar / Calibrar Sistema</button>
+
+  <!-- Panel Principal de Métricas en Grid (Estilo index) -->
   <div class="grid">
-    <div class="card"><div class="label">Pasos</div><div class="value" id="steps">0</div></div>
-    <div class="card"><div class="label">Velocidad estimada</div><div class="value" id="speed">0.00 m/s</div></div>
-    <div class="card"><div class="label">Distancia estimada</div><div class="value" id="distance">0.00 m</div></div>
-    <div class="card"><div class="label">Rumbo verdadero</div><div class="value" id="heading">--°</div></div>
-    <div class="card"><div class="label">Último intervalo</div><div class="value" id="interval">-- ms</div></div>
+    <div class="card"><div class="label">Pasos Totales</div><div class="value highlight" id="steps">0</div></div>
+    <div class="card"><div class="label">Velocidad Instantánea</div><div class="value" id="speed">0.00 m/s</div></div>
+    <div class="card"><div class="label">Velocidad (km/h)</div><div class="value" id="speed-kmh">0.0 km/h</div></div>
+    <div class="card"><div class="label">Distancia Estimada (PDR)</div><div class="value" id="distance">0.00 m</div></div>
+    <div class="card"><div class="label">Rumbo / Orientación</div><div class="value" id="heading">--°</div></div>
+    <div class="card"><div class="label">Estado de Movimiento</div><div class="value warning" id="movement-state">Detenido</div></div>
   </div>
 
+  <!-- Configuración de Parámetros -->
   <div class="card" style="margin-top:12px">
     <label class="label">Longitud de paso — metros</label>
-    <input id="stepLength" type="number" step="0.01" min="0.2" max="2" value="0.70">
+    <input id="stepLength" type="number" step="0.01" min="0.2" max="2" value="0.75">
     <label class="label" style="margin-top:8px; display:block">Declinación magnética — grados, Este positivo</label>
     <input id="declination" type="number" step="0.1" value="6.5">
   </div>
 
-  <div style="margin:12px 0; display:flex; gap:8px; flex-wrap:wrap">
-    <button class="start" id="startBtn">Iniciar sensores</button>
+  <!-- Botones de Control de Sensores -->
+  <div class="btn-group">
+    <button class="start" id="startBtn">Iniciar Sensores</button>
     <button class="stop" id="stopBtn" disabled>Detener</button>
-    <button class="export" id="exportBtn" disabled>Exportar CSV</button>
-    <button id="clearBtn">Limpiar</button>
+    <button id="clearBtn">Limpiar Datos</button>
   </div>
 
-  <canvas id="map"></canvas>
+  <!-- Visualizador Gráfico de Trayectoria PDR -->
+  <div class="card" style="margin-top:12px">
+    <h2>🗺️ Trayectoria Estimada (PDR) & Mapa Relativo</h2>
+    <div class="data-row"><span class="label">Posición Relativa (X, Y):</span> <span id="pdr-pos" class="value">0.0m, 0.0m</span></div>
+    <canvas id="map"></canvas>
+    <button class="export" onclick="exportPDRCSV()">📥 Exportar Trayectoria PDR a CSV</button>
+  </div>
+
+  <!-- Panel de Velocidad Inercial Avanzada -->
+  <div class="card" style="margin-top:12px">
+    <h2>⚡ Registro de Velocidad Inercial</h2>
+    <div class="data-row"><span class="label">Velocidad Promedio:</span> <span id="speed-avg-kmh" class="value">0.0 km/h</span></div>
+    <button class="export" onclick="exportSpeedCSV()">📥 Exportar Registro de Velocidad a CSV</button>
+  </div>
+
+  <!-- Panel de GPS -->
+  <div class="card" style="margin-top:12px">
+    <h2>📍 GPS (Máx. 5000 Registros)</h2>
+    <div class="data-row"><span class="label">Latitud:</span> <span id="gps-lat" class="value">0.000000</span></div>
+    <div class="data-row"><span class="label">Longitud:</span> <span id="gps-lon" class="value">0.000000</span></div>
+    <div class="data-row"><span class="label">Precisión GPS:</span> <span id="gps-acc" class="value">0.0</span> m</div>
+    <div class="data-row"><span class="label">Registros Guardados:</span> <span id="gps-count" class="value">0 / 5000</span></div>
+    
+    <button id="gps-toggle-btn" class="toggle active" onclick="toggleGPS()">🛰️ Desactivar Registro GPS</button>
+    <button class="start" onclick="saveGPSPoint()">💾 Guardar Coordenada GPS Actual</button>
+    <button class="export" onclick="exportGPSCSV()">📥 Exportar GPS a CSV</button>
+    <div id="gps-log" class="log-container">Aún no hay coordenadas GPS guardadas.</div>
+  </div>
+
+  <!-- Panel de IMU Avanzado & Registro de Pasos -->
+  <div class="card" style="margin-top:12px">
+    <h2>🚶‍♂️ IMU, Orientación & Sensores Detallados</h2>
+    <div class="data-row"><span class="label">Referencia Norte:</span> <span id="north-ref" class="value" style="font-size: 0.8rem; color: #a7f3d0;">Buscando...</span></div>
+    <div class="data-row"><span class="label">Presión Barométrica:</span> <span id="live-pressure" class="value">No disponible</span></div>
+    <div class="data-row"><span class="label">Acelerómetro (X,Y,Z):</span> <span id="live-acc" class="value">0, 0, 0</span></div>
+    <div class="data-row"><span class="label">Giroscopio (X,Y,Z):</span> <span id="live-gyro" class="value">0, 0, 0</span></div>
+
+    <button id="sensors-toggle-btn" class="toggle active" onclick="toggleSensors()">🔋 Desactivar Registro de Pasos</button>
+    <button class="export" onclick="exportStepsCSV()">📥 Exportar Pasos y Sensores a CSV</button>
+    <div id="step-log" class="log-container">Los datos detallados de los sensores al dar un paso aparecerán aquí.</div>
+  </div>
 
   <h2>Últimos pasos registrados</h2>
   <div style="overflow:auto">
@@ -68,8 +128,7 @@
   </div>
 
   <p class="note">
-    La trayectoria es relativa: parte en (0, 0), avanza la longitud de paso configurada en la dirección del rumbo verdadero.
-    El norte verdadero se calcula sumando la declinación magnética al rumbo magnético del dispositivo.
+    La trayectoria PDR calcula el desplazamiento relativo usando la longitud de paso y la orientación magnética/geográfica corregida con declinación.
   </p>
 </main>
 
@@ -79,13 +138,41 @@ const canvas = $('map'), ctx = canvas.getContext('2d');
 
 let running = false;
 let records = [];
+let speedLogs = [];
+let savedGPSPoints = [];
+let stepLogs = [];
+
 let lastStepTime = null;
+let firstStepTime = null;
 let lastPeakTime = 0;
 let lastMagnitude = 9.81;
 let peakArmed = true;
 let currentHeading = null;
 let x = 0, y = 0;
-let minX = 0, maxX = 0, minY = 0, maxY = 0;
+let minX = -2, maxX = 2, minY = -2, maxY = 2;
+
+let currentSpeedMS = 0.0;
+let averageSpeedMS = 0.0;
+let totalDistance = 0.0;
+
+let sensorData = {
+    accel: { x: 0, y: 0, z: 0 },
+    gyro: { x: 0, y: 0, z: 0 },
+    yaw: 0,
+    northType: 'Magnético',
+    pressure: null,
+    gps: { lat: 0, lon: 0, accuracy: 0, rawLat: null, rawLon: null }
+};
+
+let gpsWatchId = null;
+let isGpsActive = true;
+let isSensorsLoggingActive = true;
+
+window.addEventListener('load', () => {
+    startGPS();
+    startBarometer();
+    drawTrack();
+});
 
 function nowMs() {
   return Math.round(performance.timeOrigin + performance.now());
@@ -110,6 +197,9 @@ function requestSensors() {
 function startListening() {
   window.addEventListener('devicemotion', onMotion);
   window.addEventListener('deviceorientation', onOrientation);
+  if ('ondeviceorientationabsolute' in window) {
+      window.addEventListener('deviceorientationabsolute', onAbsoluteOrientation);
+  }
   running = true;
   $('startBtn').disabled = true;
   $('stopBtn').disabled = false;
@@ -118,9 +208,16 @@ function startListening() {
 function stopListening() {
   window.removeEventListener('devicemotion', onMotion);
   window.removeEventListener('deviceorientation', onOrientation);
+  window.removeEventListener('deviceorientationabsolute', onAbsoluteOrientation);
   running = false;
   $('startBtn').disabled = false;
   $('stopBtn').disabled = true;
+}
+
+function onAbsoluteOrientation(event) {
+  if (event.alpha !== null) {
+      sensorData.northType = 'Geográfico (Verdadero)';
+  }
 }
 
 function onOrientation(event) {
@@ -128,14 +225,15 @@ function onOrientation(event) {
 
   if (typeof event.webkitCompassHeading === 'number') {
     magneticHeading = event.webkitCompassHeading;
+    sensorData.northType = 'Geográfico (Verdadero - iOS)';
   } else if (typeof event.alpha === 'number') {
-    // Aproximación para Android/Chrome: 360 - alpha corrige el sentido horario.
     magneticHeading = (360 - event.alpha) % 360;
   }
 
   if (magneticHeading !== null) {
     const declination = parseFloat($('declination').value || 0);
     currentHeading = (magneticHeading + declination + 360) % 360;
+    sensorData.yaw = currentHeading;
     $('heading').textContent = currentHeading.toFixed(2) + '°';
   }
 }
@@ -154,28 +252,44 @@ function onMotion(event) {
   const gy = g.beta ?? 0;
   const gz = g.gamma ?? 0;
 
+  sensorData.accel = { x: parseFloat(ax.toFixed(2)), y: parseFloat(ay.toFixed(2)), z: parseFloat(az.toFixed(2)) };
+  sensorData.gyro = { x: parseFloat(gx.toFixed(2)), y: parseFloat(gy.toFixed(2)), z: parseFloat(gz.toFixed(2)) };
+
   const magnitude = Math.sqrt(ax * ax + ay * ay + az * az);
   const t = nowMs();
 
   detectStep(t, magnitude, ax, ay, az, gx, gy, gz);
-
-  $('speed').textContent = '—';
 }
 
 function detectStep(t, magnitude, ax, ay, az, gx, gy, gz) {
   const rising = magnitude > lastMagnitude;
-  const isPeak = peakArmed && rising && magnitude > 12.5;
+  const isPeak = peakArmed && rising && magnitude > 11.5;
   const cooldownPassed = t - lastPeakTime > 280;
 
   if (isPeak && cooldownPassed) {
     peakArmed = false;
     lastPeakTime = t;
+    if (!firstStepTime) firstStepTime = t;
 
     const dt = lastStepTime === null ? 0 : t - lastStepTime;
-    const stepLength = parseFloat($('stepLength').value || 0.70);
-    const speed = dt > 0 ? stepLength / (dt / 1000) : 0;
+    const stepLength = parseFloat($('stepLength').value || 0.75);
+    
+    // Cálculo preciso de velocidad instantánea basado en intervalo de tiempo entre pasos
+    if (dt > 0) {
+      currentSpeedMS = stepLength / (dt / 1000);
+    } else {
+      currentSpeedMS = 0.8;
+    }
 
-    if (lastStepTime !== null && currentHeading !== null) {
+    totalDistance += stepLength;
+
+    // Velocidad promedio inercial acumulada
+    let totalElapsedSeconds = (t - firstStepTime) / 1000.0;
+    if (totalElapsedSeconds > 0) {
+      averageSpeedMS = totalDistance / totalElapsedSeconds;
+    }
+
+    if (currentHeading !== null) {
       const rad = currentHeading * Math.PI / 180;
       x += stepLength * Math.sin(rad);
       y += stepLength * Math.cos(rad);
@@ -187,7 +301,7 @@ function detectStep(t, magnitude, ax, ay, az, gx, gy, gz) {
       step: records.length + 1,
       t,
       dt,
-      speed,
+      speed: currentSpeedMS,
       ax, ay, az,
       gx, gy, gz,
       heading: currentHeading,
@@ -198,9 +312,32 @@ function detectStep(t, magnitude, ax, ay, az, gx, gy, gz) {
     lastStepTime = t;
 
     $('steps').textContent = records.length;
-    $('speed').textContent = speed.toFixed(2) + ' m/s';
-    $('distance').textContent = (records.length * stepLength).toFixed(2) + ' m';
-    $('interval').textContent = dt + ' ms';
+    $('distance').textContent = totalDistance.toFixed(2) + ' m';
+    $('interval').textContent = dt + ' ms';$('pdr-pos').textContent = `${x.toFixed(1)}m, ${y.toFixed(1)}m`;
+
+    speedLogs.push({
+      timestamp: new Date().toISOString(),
+      step: records.length,
+      speedMS: currentSpeedMS.toFixed(2),
+      speedKMH: (currentSpeedMS * 3.6).toFixed(2)
+    });
+
+    if (isSensorsLoggingActive) {
+      stepLogs.push({
+        step: records.length,
+        timestamp: new Date().toISOString(),
+        accelX: ax.toFixed(2),
+        accelY: ay.toFixed(2),
+        accelZ: az.toFixed(2),
+        gyroX: gx.toFixed(2),
+        gyroY: gy.toFixed(2),
+        gyroZ: gz.toFixed(2),
+        yaw: currentHeading !== null ? currentHeading.toFixed(2) : '--',
+        pressure: sensorData.pressure,
+        posX: x.toFixed(2),
+        posY: y.toFixed(2)
+      });
+    }
 
     addRow(record);
     drawTrack();
@@ -209,6 +346,127 @@ function detectStep(t, magnitude, ax, ay, az, gx, gy, gz) {
 
   if (!rising) peakArmed = true;
   lastMagnitude = magnitude;
+}
+
+// Actualizador periódico de estado y velocidad inercial sin movimiento
+setInterval(() => {
+  let now = nowMs();
+  if (lastStepTime > 0 && (now - lastStepTime) > 1800) {
+    currentSpeedMS = Math.max(0, currentSpeedMS - 0.15);
+  }
+
+  let speedKMH = currentSpeedMS * 3.6;
+  let avgSpeedKMH = averageSpeedMS * 3.6;
+
+  $('speed').textContent = currentSpeedMS.toFixed(2) + ' m/s';
+  $('speed-kmh').textContent = speedKMH.toFixed(1) + ' km/h';$('speed-avg-kmh').textContent = avgSpeedKMH.toFixed(1) + ' km/h';
+
+  let stateElem = $('movement-state');
+  if (speedKMH > 0.5) {
+      stateElem.innerText = "En movimiento 🚶‍♂️";
+      stateElem.className = "value highlight";
+  } else {
+      stateElem.innerText = "Detenido 🛑";
+      stateElem.className = "value warning";
+  }
+
+  $('gps-lat').textContent = sensorData.gps.lat;
+  $('gps-lon').textContent = sensorData.gps.lon;
+  $('gps-acc').textContent = sensorData.gps.accuracy;
+  $('north-ref').textContent = sensorData.northType;
+  $('live-pressure').textContent = sensorData.pressure !== null ? `${sensorData.pressure} hPa` : "No disponible";
+  $('live-acc').textContent = `${sensorData.accel.x}, ${sensorData.accel.y}, ${sensorData.accel.z}`;
+  $('live-gyro').textContent = `${sensorData.gyro.x}, ${sensorData.gyro.y}, ${sensorData.gyro.z}`;
+
+  if (stepLogs.length > 0 && isSensorsLoggingActive) {
+      let logHtml = stepLogs.slice(-20).reverse().map(s => 
+          `Paso #${s.step} -> Rumbo: ${s.yaw}° | Pos: [${s.posX}, ${s.posY}]m`
+      ).join('<br>');
+      $('step-log').innerHTML = logHtml;
+  }
+}, 100);
+
+function toggleSensors() {
+  isSensorsLoggingActive = !isSensorsLoggingActive;
+  let btn = $('sensors-toggle-btn');
+  if (isSensorsLoggingActive) {
+      btn.innerText = "🔋 Desactivar Registro de Pasos";
+      btn.classList.add('active');
+  } else {
+      btn.innerText = "🔋 Activar Registro de Pasos";
+      btn.classList.remove('active');
+  }
+}
+
+function toggleGPS() {
+  isGpsActive = !isGpsActive;
+  let btn = $('gps-toggle-btn');
+  if (isGpsActive) {
+      startGPS();
+      btn.innerText = "🛰️ Desactivar Registro GPS";
+      btn.classList.add('active');
+  } else {
+      if (gpsWatchId !== null) {
+          navigator.geolocation.clearWatch(gpsWatchId);
+          gpsWatchId = null;
+      }
+      btn.innerText = "🛰️ Activar Registro GPS";
+      btn.classList.remove('active');
+  }
+}
+
+function startGPS() {
+  if (navigator.geolocation) {
+      gpsWatchId = navigator.geolocation.watchPosition(
+          (position) => {
+              sensorData.gps.rawLat = position.coords.latitude;
+              sensorData.gps.rawLon = position.coords.longitude;
+              sensorData.gps.lat = position.coords.latitude.toFixed(6);
+              sensorData.gps.lon = position.coords.longitude.toFixed(6);
+              sensorData.gps.accuracy = position.coords.accuracy.toFixed(1);
+          },
+          (error) => { console.error("GPS Error:", error.message); },
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+      );
+  }
+}
+
+function saveGPSPoint() {
+  if (sensorData.gps.rawLat === null) {
+      alert("Esperando señal GPS...");
+      return;
+  }
+  if (savedGPSPoints.length >= 5000) {
+      alert("Límite máximo de 5000 registros GPS alcanzado.");
+      return;
+  }
+
+  let pointData = {
+      timestamp: new Date().toISOString(),
+      latitud: sensorData.gps.lat,
+      longitud: sensorData.gps.lon,
+      precision: sensorData.gps.accuracy
+  };
+  
+  savedGPSPoints.push(pointData);
+  $('gps-count').innerText = `${savedGPSPoints.length} / 5000`;
+  $('gps-log').innerHTML = savedGPSPoints.slice(-30).reverse().map(p => 
+      `[${p.timestamp.split('T')[1].slice(0,8)}] Lat: ${p.latitud}, Lon: ${p.longitud} (${p.precision}m)`
+  ).join('<br>');
+}
+
+function startBarometer() {
+  if ('Barometer' in window) {
+      try {
+          const barometer = new Barometer({ frequency: 10 });
+          barometer.addEventListener('reading', () => {
+              sensorData.pressure = parseFloat(barometer.pressure.toFixed(2));
+          });
+          barometer.start();
+      } catch (e) {
+          console.log("Barómetro no disponible.");
+      }
+  }
 }
 
 function addRow(r) {
@@ -227,56 +485,69 @@ function addRow(r) {
     <td>${r.heading === null ? '--' : r.heading.toFixed(2)}</td>`;
   $('log').prepend(tr);
 
-  while ($('log').children.length > 30) {
-    $('log').lastChild.remove();
+  while ($('log').children.length > 30) {$('log').lastChild.remove();
   }
 }
 
 function drawTrack() {
   const w = canvas.width = canvas.clientWidth * devicePixelRatio;
-  const h = canvas.height = 380 * devicePixelRatio;
+  const h = canvas.height = 320 * devicePixelRatio;
   ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-  ctx.clearRect(0, 0, canvas.clientWidth, 380);
+  ctx.clearRect(0, 0, canvas.clientWidth, 320);
 
   const pad = 30;
-  const rangeX = Math.max(maxX - minX, 1);
-  const rangeY = Math.max(maxY - minY, 1);
-  const scale = Math.min((canvas.clientWidth - 2 * pad) / rangeX, (380 - 2 * pad) / rangeY);
+  const rangeX = Math.max(maxX - minX, 2);
+  const rangeY = Math.max(maxY - minY, 2);
+  const scale = Math.min((canvas.clientWidth - 2 * pad) / rangeX, (320 - 2 * pad) / rangeY);
 
-  const px = vx => pad + (vx - minX) * scale;
-  const py = vy => 380 - pad - (vy - minY) * scale;
+  const px = vx => canvas.clientWidth / 2 + (vx * scale);
+  const py = vy => 320 / 2 - (vy * scale);
 
-  // Norte verdadero: arriba del lienzo.
+  // Ejes de referencia en el Canvas
+  ctx.strokeStyle = '#30363d';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(canvas.clientWidth / 2, 0); ctx.lineTo(canvas.clientWidth / 2, 320);
+  ctx.moveTo(0, 320 / 2); ctx.lineTo(canvas.clientWidth, 320 / 2);
+  ctx.stroke();
+
+  // Indicador de Norte Verdadero
   ctx.strokeStyle = '#8b949e';
   ctx.beginPath();
-  ctx.moveTo(canvas.clientWidth - 40, 330);
-  ctx.lineTo(canvas.clientWidth - 40, 250);
+  ctx.moveTo(canvas.clientWidth - 35, 65);
+  ctx.lineTo(canvas.clientWidth - 35, 25);
   ctx.stroke();
   ctx.fillStyle = '#8b949e';
   ctx.font = '12px system-ui';
-  ctx.fillText('N', canvas.clientWidth - 45, 240);
+  ctx.fillText('N', canvas.clientWidth - 39, 17);
 
-  if (records.length < 2) return;
+  if (records.length < 1) return;
 
-  ctx.strokeStyle = '#58a6ff';
+  ctx.strokeStyle = '#38bdf8';
   ctx.lineWidth = 2.5;
   ctx.beginPath();
-  ctx.moveTo(px(records[0].x), py(records[0].y));
+  ctx.moveTo(px(0), py(0));
 
   for (const r of records) ctx.lineTo(px(r.x), py(r.y));
   ctx.stroke();
 
-  const first = records[0], last = records[records.length - 1];
-  ctx.fillStyle = '#3fb950';
-  ctx.beginPath(); ctx.arc(px(first.x), py(first.y), 5, 0, Math.PI * 2); ctx.fill();
-
-  ctx.fillStyle = '#f85149';
+  const last = records[records.length - 1];
+  ctx.fillStyle = '#4ade80';
   ctx.beginPath(); ctx.arc(px(last.x), py(last.y), 5, 0, Math.PI * 2); ctx.fill();
 }
 
-function exportCsv() {
-  if (!records.length) return;
+function exportCsvData(filename, header, rows) {
+  const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
+function exportCsv() {
+  if (!records.length) { alert("No hay datos de pasos para exportar."); return; }
   const header = 'paso,tiempo_ms,delta_t_ms,velocidad_m_s,acelerometro_x,acelerometro_y,acelerometro_z,giroscopio_x,giroscopio_y,giroscopio_z,rumbo_verdadero_grados,x_m,y_m\n';
   const rows = records.map(r => [
     r.step, r.t, r.dt, r.speed.toFixed(2),
@@ -285,30 +556,64 @@ function exportCsv() {
     r.heading === null ? '' : r.heading.toFixed(2),
     r.x.toFixed(2), r.y.toFixed(2)
   ].join(',')).join('\n');
+  exportCsvData('trayectoria_pasos.csv', header, rows);
+}
 
-  const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = 'trayectoria_pasos.csv';
-  link.click();
-  URL.revokeObjectURL(url);
+function exportSpeedCSV() {
+  if (!speedLogs.length) { alert("No hay registros de velocidad."); return; }
+  const header = 'Paso,Timestamp,Velocidad_m_s,Velocidad_km_h\n';
+  const rows = speedLogs.map(r => `${r.step},${r.timestamp},${r.speedMS},${r.speedKMH}`).join('\n');
+  exportCsvData('registros_velocidad.csv', header, rows);
+}
+
+function exportGPSCSV() {
+  if (!savedGPSPoints.length) { alert("No hay registros GPS guardados."); return; }
+  const header = 'Timestamp,Latitud,Longitud,Precision_m\n';
+  const rows = savedGPSPoints.map(r => `${r.timestamp},${r.latitud},${r.longitud},${r.precision}`).join('\n');
+  exportCsvData('registros_gps.csv', header, rows);
+}
+
+function exportStepsCSV() {
+  if (!stepLogs.length) { alert("No hay registros de sensores detallados."); return; }
+  const header = 'Paso,Timestamp,Accel_X,Accel_Y,Accel_Z,Gyro_X,Gyro_Y,Gyro_Z,Yaw,Pressure_hPa,Rel_X,Rel_Y\n';
+  const rows = stepLogs.map(r => `${r.step},${r.timestamp},${r.accelX},${r.accelY},${r.accelZ},${r.gyroX},${r.gyroY},${r.gyroZ},${r.yaw},${r.pressure},${r.posX},${r.posY}`).join('\n');
+  exportCsvData('registros_sensores_pasos.csv', header, rows);
+}
+
+function exportPDRCSV() {
+  if (!records.length) { alert("No hay datos de trayectoria PDR."); return; }
+  const header = 'Timestamp,X_meters,Y_meters\n';
+  const rows = records.map(r => `${new Date(r.t).toISOString()},${r.x.toFixed(2)},${r.y.toFixed(2)}`).join('\n');
+  exportCsvData('trayectoria_pdr.csv', header, rows);
+}
+
+function resetTest() {
+  if (confirm("¿Estás seguro de reiniciar? Se borrarán todos los registros acumulados y la trayectoria.")) {
+    records = [];
+    speedLogs = [];
+    savedGPSPoints = [];
+    stepLogs = [];
+    lastStepTime = null;
+    firstStepTime = null;
+    x = y = 0;
+    minX = -2; maxX = 2; minY = -2; maxY = 2;
+    currentSpeedMS = 0.0;
+    averageSpeedMS = 0.0;
+    totalDistance = 0.0;
+
+    $('steps').textContent = '0';$('speed').textContent = '0.00 m/s';
+    $('speed-kmh').textContent = '0.0 km/h';$('speed-avg-kmh').textContent = '0.0 km/h';
+    $('distance').textContent = '0.00 m';$('interval').textContent = '-- ms';
+    $('pdr-pos').textContent = '0.0m, 0.0m';$('gps-count').innerText = "0 / 5000";
+    $('gps-log').innerHTML = "Aún no hay coordenadas GPS guardadas.";
+    $('log').innerHTML = '';$('step-log').innerHTML = "Los datos detallados de los sensores al dar un paso aparecerán aquí.";
+    drawTrack();
+  }
 }
 
 $('startBtn').onclick = requestSensors;
 $('stopBtn').onclick = stopListening;
-$('exportBtn').onclick = exportCsv;
-$('clearBtn').onclick = () => {
-  records = [];
-  lastStepTime = null;
-  x = y = minX = maxX = minY = maxY = 0;
-  $('steps').textContent = '0';
-  $('speed').textContent = '0.00 m/s';
-  $('distance').textContent = '0.00 m';
-  $('interval').textContent = '-- ms';
-  $('log').innerHTML = '';
-  drawTrack();
-};
+$('clearBtn').onclick = resetTest;
 
 window.addEventListener('resize', drawTrack);
 drawTrack();
