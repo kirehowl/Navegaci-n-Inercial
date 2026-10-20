@@ -1,549 +1,317 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visor GPS y Captura Fotográfica</title>
-    <!-- Tailwind CSS for modern responsive UI -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts Inter -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                }
-            }
-        }
-    </script>
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        .glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); }
-        .dark .glass { background: rgba(17, 24, 39, 0.85); backdrop-filter: blur(12px); }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registro de pasos, sensores y trayectoria</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: system-ui, sans-serif; margin: 0; background: #0d1117; color: #e6edf3; }
+  main { padding: 16px; max-width: 900px; margin: auto; }
+  h1 { font-size: 1.25rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 12px; }
+  .label { font-size: .75rem; color: #8b949e; }
+  .value { font-size: 1.15rem; font-weight: 700; }
+  button { border: 0; border-radius: 8px; padding: 10px 14px; font-weight: 700; cursor: pointer; }
+  .start { background: #238636; color: white; }
+  .stop { background: #da3633; color: white; }
+  .export { background: #1f6feb; color: white; }
+  canvas { width: 100%; height: 380px; background: #010409; border: 1px solid #30363d; border-radius: 10px; }
+  input { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: #e6edf3; }
+  table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+  th, td { border-bottom: 1px solid #21262d; padding: 5px; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  .note { color: #8b949e; font-size: .82rem; }
+</style>
 </head>
-<body class="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-300">
+<body>
+<main>
+  <h1>Registro de pasos, sensores IMU y trayectoria</h1>
 
-    <!-- Header -->
-    <header class="sticky top-0 z-50 glass border-b border-slate-200 dark:border-slate-800 shadow-sm">
-        <div class="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
-            <div class="flex items-center space-x-3">
-                <div class="bg-indigo-600 text-white p-2.5 rounded-xl shadow-md shadow-indigo-500/20">
-                    <i class="fa-solid fa-location-crosshairs text-xl animate-pulse"></i>
-                </div>
-                <div>
-                    <h1 class="font-bold text-lg tracking-tight">GeoCam Pro</h1>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">GPS & Captura de Campo</p>
-                </div>
-            </div>
-            <div class="flex items-center space-x-2">
-                <button onclick="toggleDarkMode()" class="p-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 transition" title="Cambiar Tema">
-                    <i id="theme-icon" class="fa-solid fa-moon"></i>
-                </button>
-            </div>
-        </div>
-    </header>
+  <div class="grid">
+    <div class="card"><div class="label">Pasos</div><div class="value" id="steps">0</div></div>
+    <div class="card"><div class="label">Velocidad estimada</div><div class="value" id="speed">0.00 m/s</div></div>
+    <div class="card"><div class="label">Distancia estimada</div><div class="value" id="distance">0.00 m</div></div>
+    <div class="card"><div class="label">Rumbo verdadero</div><div class="value" id="heading">--°</div></div>
+    <div class="card"><div class="label">Último intervalo</div><div class="value" id="interval">-- ms</div></div>
+  </div>
 
-    <!-- Main Content Container -->
-    <main class="flex-1 max-w-5xl w-full mx-auto px-4 py-6 space-y-6">
+  <div class="card" style="margin-top:12px">
+    <label class="label">Longitud de paso — metros</label>
+    <input id="stepLength" type="number" step="0.01" min="0.2" max="2" value="0.70">
+    <label class="label" style="margin-top:8px; display:block">Declinación magnética — grados, Este positivo</label>
+    <input id="declination" type="number" step="0.1" value="6.5">
+  </div>
 
-        <!-- Notification / Message Box (Custom alert alternative) -->
-        <div id="toast" class="hidden fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-lg border text-sm flex items-center space-x-2 transition-all duration-300 transform translate-y-10 opacity-0">
-            <span id="toast-icon"></span>
-            <span id="toast-message"></span>
-        </div>
+  <div style="margin:12px 0; display:flex; gap:8px; flex-wrap:wrap">
+    <button class="start" id="startBtn">Iniciar sensores</button>
+    <button class="stop" id="stopBtn" disabled>Detener</button>
+    <button class="export" id="exportBtn" disabled>Exportar CSV</button>
+    <button id="clearBtn">Limpiar</button>
+  </div>
 
-        <!-- GPS Status & Telemetry Card -->
-        <section class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-700">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-slate-100 dark:border-slate-700 mb-4 gap-3">
-                <div>
-                    <h2 class="font-semibold text-base flex items-center gap-2">
-                        <i class="fa-solid fa-satellite text-indigo-500"></i> Estado del Sensor GPS
-                    </h2>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Monitoreo de posición en tiempo real</p>
-                </div>
-                <div class="flex items-center gap-2 w-full sm:w-auto">
-                    <button onclick="toggleTracking()" id="track-btn" class="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-500/20 transition flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-play text-[10px]"></i> <span id="track-btn-text">Iniciar Rastreo</span>
-                    </button>
-                    <button onclick="updatePositionOnce()" class="px-3 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-xl text-xs font-medium transition flex items-center gap-1.5" title="Actualizar posición actual">
-                        <i class="fa-solid fa-rotate-right"></i>
-                    </button>
-                </div>
-            </div>
+  <canvas id="map"></canvas>
 
-            <!-- Telemetry Grid -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div class="bg-slate-50 dark:bg-slate-900/50 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                    <span class="text-xs text-slate-400 block mb-1">Latitud</span>
-                    <span id="val-lat" class="font-mono font-semibold text-sm sm:text-base text-slate-700 dark:text-slate-200">--</span>
-                </div>
-                <div class="bg-slate-50 dark:bg-slate-900/50 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                    <span class="text-xs text-slate-400 block mb-1">Longitud</span>
-                    <span id="val-lon" class="font-mono font-semibold text-sm sm:text-base text-slate-700 dark:text-slate-200">--</span>
-                </div>
-                <div class="bg-slate-50 dark:bg-slate-900/50 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                    <span class="text-xs text-slate-400 block mb-1">Precisión GPS</span>
-                    <div class="flex items-baseline gap-1">
-                        <span id="val-acc" class="font-mono font-semibold text-sm sm:text-base text-indigo-600 dark:text-indigo-400">--</span>
-                        <span class="text-xs text-slate-400">metros</span>
-                    </div>
-                </div>
-                <div class="bg-slate-50 dark:bg-slate-900/50 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                    <span class="text-xs text-slate-400 block mb-1">Altitud</span>
-                    <div class="flex items-baseline gap-1">
-                        <span id="val-alt" class="font-mono font-semibold text-sm sm:text-base text-slate-700 dark:text-slate-200">--</span>
-                        <span class="text-xs text-slate-400">m</span>
-                    </div>
-                </div>
-            </div>
-            <div id="gps-status-msg" class="mt-3 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5 hidden">
-                <i class="fa-solid fa-triangle-exclamation"></i> <span>Buscando señal GPS de alta precisión...</span>
-            </div>
-        </section>
+  <h2>Últimos pasos registrados</h2>
+  <div style="overflow:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Paso</th><th>Tiempo ms</th><th>Δt ms</th><th>Vel. m/s</th>
+          <th>AccX</th><th>AccY</th><th>AccZ</th>
+          <th>GyroX</th><th>GyroY</th><th>GyroZ</th><th>Rumbo°</th>
+        </tr>
+      </thead>
+      <tbody id="log"></tbody>
+    </table>
+  </div>
 
-        <!-- Camera Section -->
-        <section class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-700">
-            <div class="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-slate-700 mb-4">
-                <div>
-                    <h2 class="font-semibold text-base flex items-center gap-2">
-                        <i class="fa-solid fa-camera text-indigo-500"></i> Captura Fotográfica con Geo-etiqueta
-                    </h2>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Toma fotos integrando automáticamente las coordenadas actuales</p>
-                </div>
-            </div>
+  <p class="note">
+    La trayectoria es relativa: parte en (0, 0), avanza la longitud de paso configurada en la dirección del rumbo verdadero.
+    El norte verdadero se calcula sumando la declinación magnética al rumbo magnético del dispositivo.
+  </p>
+</main>
 
-            <div class="space-y-4">
-                <!-- Camera Viewport container -->
-                <div id="camera-container" class="relative w-full aspect-[4/3] sm:aspect-[16/9] bg-slate-900 rounded-xl overflow-hidden flex flex-col items-center justify-center border border-slate-800 shadow-inner">
-                    <!-- Video stream -->
-                    <video id="camera-stream" autoplay playsinline muted class="absolute inset-0 w-full h-full object-cover hidden"></video>
-                    <!-- Captured Canvas preview (hidden until capture) -->
-                    <canvas id="snapshot-canvas" class="hidden"></canvas>
-                    
-                    <!-- Placeholder when camera is off -->
-                    <div id="camera-placeholder" class="text-center p-6 text-slate-400">
-                        <i class="fa-solid fa-video-slash text-4xl mb-2 opacity-50"></i>
-                        <p class="text-sm">La cámara está desactivada</p>
-                        <p class="text-xs text-slate-500 mt-1">Presiona el botón inferior para activar la cámara del dispositivo</p>
-                    </div>
+<script>
+const $ = id => document.getElementById(id);
+const canvas = $('map'), ctx = canvas.getContext('2d');
 
-                    <!-- HUD overlay on camera -->
-                    <div id="camera-hud" class="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-white text-[11px] px-3 py-1.5 rounded-lg font-mono hidden flex items-center gap-2 border border-white/10">
-                        <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
-                        <span id="hud-coords">GPS: Pendiente...</span>
-                    </div>
-                </div>
+let running = false;
+let records = [];
+let lastStepTime = null;
+let lastPeakTime = 0;
+let lastMagnitude = 9.81;
+let peakArmed = true;
+let currentHeading = null;
+let x = 0, y = 0;
+let minX = 0, maxX = 0, minY = 0, maxY = 0;
 
-                <!-- Camera Controls -->
-                <div class="flex flex-wrap items-center justify-center gap-3">
-                    <button id="cam-toggle-btn" onclick="toggleCamera()" class="px-5 py-2.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-xl text-xs font-semibold transition flex items-center gap-2">
-                        <i class="fa-solid fa-power-off"></i> <span id="cam-btn-text">Activar Cámara</span>
-                    </button>
-                    <button id="shoot-btn" onclick="capturePhoto()" disabled class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-500/20 transition flex items-center gap-2">
-                        <i class="fa-solid fa-camera-retro"></i> Capturar Foto
-                    </button>
-                </div>
-            </div>
-        </section>
+function nowMs() {
+  return Math.round(performance.timeOrigin + performance.now());
+}
 
-        <!-- Local Gallery Section -->
-        <section class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-700">
-            <div class="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-slate-700 mb-4">
-                <div>
-                    <h2 class="font-semibold text-base flex items-center gap-2">
-                        <i class="fa-solid fa-images text-indigo-500"></i> Galería Local
-                    </h2>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Imágenes almacenadas con metadatos geográficos</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span id="gallery-count" class="text-xs font-medium px-2.5 py-1 bg-slate-100 dark:bg-slate-700 rounded-lg">0 fotos</span>
-                    <button onclick="clearGallery()" id="clear-gallery-btn" class="hidden px-3 py-1 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 rounded-lg text-xs font-medium transition">
-                        Limpiar Todo
-                    </button>
-                </div>
-            </div>
+function requestSensors() {
+  const needsPermission = typeof DeviceMotionEvent !== 'undefined' &&
+    typeof DeviceMotionEvent.requestPermission === 'function';
 
-            <!-- Gallery Grid -->
-            <div id="gallery-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                <!-- Dynamic cards injected here -->
-            </div>
+  if (needsPermission) {
+    DeviceMotionEvent.requestPermission()
+      .then(state => {
+        if (state === 'granted') startListening();
+        else alert('Permiso de sensores denegado.');
+      })
+      .catch(err => alert('No se pudo solicitar permiso: ' + err.message));
+  } else {
+    startListening();
+  }
+}
 
-            <!-- Empty state -->
-            <div id="gallery-empty" class="text-center py-12 text-slate-400">
-                <i class="fa-solid fa-mountain-sun text-4xl mb-2 opacity-30"></i>
-                <p class="text-sm">No hay fotos guardadas todavía</p>
-                <p class="text-xs text-slate-500 mt-1">Las capturas que realices aparecerán almacenadas aquí localmente</p>
-            </div>
-        </section>
+function startListening() {
+  window.addEventListener('devicemotion', onMotion);
+  window.addEventListener('deviceorientation', onOrientation);
+  running = true;
+  $('startBtn').disabled = true;
+  $('stopBtn').disabled = false;
+}
 
-    </main>
+function stopListening() {
+  window.removeEventListener('devicemotion', onMotion);
+  window.removeEventListener('deviceorientation', onOrientation);
+  running = false;
+  $('startBtn').disabled = false;
+  $('stopBtn').disabled = true;
+}
 
-    <!-- Footer -->
-    <footer class="text-center py-6 text-xs text-slate-400 border-t border-slate-200 dark:border-slate-800 mt-auto">
-        GeoCam Pro &bull; Aplicación Web con Geolocation API y MediaDevices
-    </footer>
+function onOrientation(event) {
+  let magneticHeading = null;
 
-    <!-- Image Detail Modal -->
-    <div id="image-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-slate-800 max-w-lg w-full rounded-2xl overflow-hidden shadow-2xl border border-slate-700 flex flex-col max-h-[90vh]">
-            <div class="p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
-                <h3 class="font-semibold text-sm flex items-center gap-2">
-                    <i class="fa-solid fa-circle-info text-indigo-500"></i> Detalle de Captura
-                </h3>
-                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
-            </div>
-            <div class="p-4 overflow-y-auto space-y-4">
-                <img id="modal-img" src="" alt="Captura ampliada" class="w-full rounded-xl object-contain max-h-[50vh] bg-slate-900">
-                <div class="grid grid-cols-2 gap-2 text-xs">
-                    <div class="bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800">
-                        <span class="text-slate-400 block">Fecha y Hora</span>
-                        <span id="modal-date" class="font-mono font-medium text-slate-700 dark:text-slate-300">--</span>
-                    </div>
-                    <div class="bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800">
-                        <span class="text-slate-400 block">Precisión</span>
-                        <span id="modal-accuracy" class="font-mono font-medium text-indigo-600 dark:text-indigo-400">--</span>
-                    </div>
-                    <div class="col-span-2 bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800">
-                        <span class="text-slate-400 block">Coordenadas GPS</span>
-                        <span id="modal-coords" class="font-mono font-medium text-slate-700 dark:text-slate-300">--</span>
-                    </div>
-                </div>
-            </div>
-            <div class="p-4 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-2 bg-slate-50 dark:bg-slate-900/30">
-                <button id="modal-download" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-download"></i> Descargar Imagen
-                </button>
-            </div>
-        </div>
-    </div>
+  if (typeof event.webkitCompassHeading === 'number') {
+    magneticHeading = event.webkitCompassHeading;
+  } else if (typeof event.alpha === 'number') {
+    // Aproximación para Android/Chrome: 360 - alpha corrige el sentido horario.
+    magneticHeading = (360 - event.alpha) % 360;
+  }
 
-    <!-- Application Script -->
-    <script>
-        // State Variables
-        let watchId = null;
-        let currentPosition = null;
-        let mediaStream = null;
-        let gallery = [];
+  if (magneticHeading !== null) {
+    const declination = parseFloat($('declination').value || 0);
+    currentHeading = (magneticHeading + declination + 360) % 360;
+    $('heading').textContent = currentHeading.toFixed(2) + '°';
+  }
+}
 
-        // DOM elements
-        const latEl = document.getElementById('val-lat');
-        const lonEl = document.getElementById('val-lon');
-        const accEl = document.getElementById('val-acc');
-        const altEl = document.getElementById('val-alt');
-        const gpsStatusMsg = document.getElementById('gps-status-msg');
-        const trackBtnText = document.getElementById('track-btn-text');
-        const trackBtn = document.getElementById('track-btn');
-        const cameraStream = document.getElementById('camera-stream');
-        const cameraPlaceholder = document.getElementById('camera-placeholder');
-        const cameraHud = document.getElementById('camera-hud');
-        const hudCoords = document.getElementById('hud-coords');
-        const camToggleBtn = document.getElementById('cam-toggle-btn');
-        const camBtnText = document.getElementById('cam-btn-text');
-        const shootBtn = document.getElementById('shoot-btn');
-        const snapshotCanvas = document.getElementById('snapshot-canvas');
-        const galleryGrid = document.getElementById('gallery-grid');
-        const galleryEmpty = document.getElementById('gallery-empty');
-        const galleryCount = document.getElementById('gallery-count');
-        const clearGalleryBtn = document.getElementById('clear-gallery-btn');
+function onMotion(event) {
+  if (!running) return;
 
-        // Init on load
-        window.onload = function() {
-            loadGalleryFromStorage();
-            updatePositionOnce();
-        };
+  const a = event.accelerationIncludingGravity || {};
+  const g = event.rotationRate || {};
 
-        // Toast Notification System
-        function showToast(message, type = 'success') {
-            const toast = document.getElementById('toast');
-            const toastMsg = document.getElementById('toast-message');
-            const toastIcon = document.getElementById('toast-icon');
+  const ax = a.x ?? 0;
+  const ay = a.y ?? 0;
+  const az = a.z ?? 0;
 
-            toastMsg.textContent = message;
-            if (type === 'success') {
-                toast.className = 'fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-lg border text-sm flex items-center space-x-2 transition-all duration-300 bg-emerald-50 dark:bg-emerald-950/90 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200';
-                toastIcon.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-600"></i>';
-            } else if (type === 'error') {
-                toast.className = 'fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-lg border text-sm flex items-center space-x-2 transition-all duration-300 bg-red-50 dark:bg-red-950/90 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200';
-                toastIcon.innerHTML = '<i class="fa-solid fa-circle-exclamation text-red-600"></i>';
-            }
+  const gx = g.alpha ?? 0;
+  const gy = g.beta ?? 0;
+  const gz = g.gamma ?? 0;
 
-            toast.classList.remove('hidden', 'translate-y-10', 'opacity-0');
-            setTimeout(() => {
-                toast.classList.add('translate-y-10', 'opacity-0');
-                setTimeout(() => toast.classList.add('hidden'), 300);
-            }, 3000);
-        }
+  const magnitude = Math.sqrt(ax * ax + ay * ay + az * az);
+  const t = nowMs();
 
-        // Dark Mode Toggle
-        function toggleDarkMode() {
-            document.documentElement.classList.toggle('dark');
-            const isDark = document.documentElement.classList.contains('dark');
-            document.getElementById('theme-icon').className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
-        }
+  detectStep(t, magnitude, ax, ay, az, gx, gy, gz);
 
-        // GPS Handling
-        function handlePositionSuccess(position) {
-            currentPosition = {
-                lat: position.coords.latitude,
-                lon: position.coords.longitude,
-                accuracy: position.coords.accuracy,
-                altitude: position.coords.altitude !== null ? position.coords.altitude : 0,
-                timestamp: new Date().toISOString()
-            };
+  $('speed').textContent = '—';
+}
 
-            latEl.textContent = currentPosition.lat.toFixed(6);
-            lonEl.textContent = currentPosition.lon.toFixed(6);
-            accEl.textContent = currentPosition.accuracy.toFixed(1);
-            altEl.textContent = currentPosition.altitude.toFixed(1);
+function detectStep(t, magnitude, ax, ay, az, gx, gy, gz) {
+  const rising = magnitude > lastMagnitude;
+  const isPeak = peakArmed && rising && magnitude > 12.5;
+  const cooldownPassed = t - lastPeakTime > 280;
 
-            gpsStatusMsg.classList.add('hidden');
-            hudCoords.textContent = `GPS: ${currentPosition.lat.toFixed(4)}, ${currentPosition.lon.toFixed(4)} (±${currentPosition.accuracy.toFixed(0)}m)`;
-        }
+  if (isPeak && cooldownPassed) {
+    peakArmed = false;
+    lastPeakTime = t;
 
-        function handlePositionError(error) {
-            let msg = "Error desconocido en el sensor GPS.";
-            if (error.code === error.PERMISSION_DENIED) {
-                msg = "Permiso de ubicación denegado por el usuario.";
-            } else if (error.code === error.POSITION_UNAVAILABLE) {
-                msg = "Información de ubicación no disponible.";
-            } else if (error.code === error.TIMEOUT) {
-                msg = "Tiempo de espera agotado al obtener el GPS.";
-            }
-            gpsStatusMsg.querySelector('span').textContent = msg;
-            gpsStatusMsg.classList.remove('hidden');
-            showToast(msg, 'error');
-        }
+    const dt = lastStepTime === null ? 0 : t - lastStepTime;
+    const stepLength = parseFloat($('stepLength').value || 0.70);
+    const speed = dt > 0 ? stepLength / (dt / 1000) : 0;
 
-        function updatePositionOnce() {
-            if (!navigator.geolocation) {
-                showToast("La geolocalización no es compatible con este navegador.", 'error');
-                return;
-            }
-            gpsStatusMsg.querySelector('span').textContent = "Obteniendo posición GPS actual...";
-            gpsStatusMsg.classList.remove('hidden');
-            navigator.geolocation.getCurrentPosition(handlePositionSuccess, handlePositionError, {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-            });
-        }
+    if (lastStepTime !== null && currentHeading !== null) {
+      const rad = currentHeading * Math.PI / 180;
+      x += stepLength * Math.sin(rad);
+      y += stepLength * Math.cos(rad);
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+    }
 
-        function toggleTracking() {
-            if (!navigator.geolocation) {
-                showToast("Geolocalización no soportada.", 'error');
-                return;
-            }
+    const record = {
+      step: records.length + 1,
+      t,
+      dt,
+      speed,
+      ax, ay, az,
+      gx, gy, gz,
+      heading: currentHeading,
+      x, y
+    };
 
-            if (watchId === null) {
-                gpsStatusMsg.querySelector('span').textContent = "Rastreo GPS en tiempo real activo...";
-                gpsStatusMsg.classList.remove('hidden');
-                watchId = navigator.geolocation.watchPosition(handlePositionSuccess, handlePositionError, {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 0
-                });
-                trackBtnText.textContent = "Detener Rastreo";
-                trackBtn.classList.replace('bg-indigo-600', 'bg-red-600');
-                trackBtn.classList.replace('hover:bg-indigo-700', 'hover:bg-red-700');
-                showToast("Rastreo GPS continuo iniciado.");
-            } else {
-                navigator.geolocation.clearWatch(watchId);
-                watchId = null;
-                gpsStatusMsg.classList.add('hidden');
-                trackBtnText.textContent = "Iniciar Rastreo";
-                trackBtn.classList.replace('bg-red-600', 'bg-indigo-600');
-                trackBtn.classList.replace('hover:bg-red-700', 'hover:bg-indigo-700');
-                showToast("Rastreo GPS detenido.");
-            }
-        }
+    records.push(record);
+    lastStepTime = t;
 
-        // Camera Handling
-        async function toggleCamera() {
-            if (mediaStream) {
-                // Stop camera
-                mediaStream.getTracks().forEach(track => track.stop());
-                mediaStream = null;
-                cameraStream.srcObject = null;
-                cameraStream.classList.add('hidden');
-                cameraPlaceholder.classList.remove('hidden');
-                cameraHud.classList.add('hidden');
-                camBtnText.textContent = "Activar Cámara";
-                camToggleBtn.querySelector('i').className = "fa-solid fa-power-off";
-                shootBtn.disabled = true;
-                showToast("Cámara desactivada.");
-            } else {
-                try {
-                    mediaStream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
-                        audio: false
-                    });
-                    cameraStream.srcObject = mediaStream;
-                    cameraStream.classList.remove('hidden');
-                    cameraPlaceholder.classList.add('hidden');
-                    cameraHud.classList.remove('hidden');
-                    camBtnText.textContent = "Apagar Cámara";
-                    camToggleBtn.querySelector('i').className = "fa-solid fa-power-off text-emerald-500";
-                    shootBtn.disabled = false;
-                    showToast("Cámara activada correctamente.");
-                } catch (err) {
-                    showToast("No se pudo acceder a la cámara del dispositivo.", 'error');
-                }
-            }
-        }
+    $('steps').textContent = records.length;
+    $('speed').textContent = speed.toFixed(2) + ' m/s';
+    $('distance').textContent = (records.length * stepLength).toFixed(2) + ' m';
+    $('interval').textContent = dt + ' ms';
 
-        function capturePhoto() {
-            if (!mediaStream) return;
+    addRow(record);
+    drawTrack();
+    setTimeout(() => peakArmed = true, 120);
+  }
 
-            // Ensure we have recent coordinates
-            if (!currentPosition) {
-                updatePositionOnce();
-            }
+  if (!rising) peakArmed = true;
+  lastMagnitude = magnitude;
+}
 
-            const video = cameraStream;
-            const canvas = snapshotCanvas;
-            canvas.width = video.videoWidth || 1280;
-            canvas.height = video.videoHeight || 720;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+function addRow(r) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>${r.step}</td>
+    <td>${r.t}</td>
+    <td>${r.dt}</td>
+    <td>${r.speed.toFixed(2)}</td>
+    <td>${r.ax.toFixed(2)}</td>
+    <td>${r.ay.toFixed(2)}</td>
+    <td>${r.az.toFixed(2)}</td>
+    <td>${r.gx.toFixed(2)}</td>
+    <td>${r.gy.toFixed(2)}</td>
+    <td>${r.gz.toFixed(2)}</td>
+    <td>${r.heading === null ? '--' : r.heading.toFixed(2)}</td>`;
+  $('log').prepend(tr);
 
-            // Stamp metadata text onto canvas or store in record
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-            
-            const photoRecord = {
-                id: Date.now(),
-                dataUrl: dataUrl,
-                date: new Date().toLocaleString(),
-                lat: currentPosition ? currentPosition.lat : 0,
-                lon: currentPosition ? currentPosition.lon : 0,
-                accuracy: currentPosition ? currentPosition.accuracy : 0,
-                altitude: currentPosition ? currentPosition.altitude : 0
-            };
+  while ($('log').children.length > 30) {
+    $('log').lastChild.remove();
+  }
+}
 
-            gallery.unshift(photoRecord);
-            saveGalleryToStorage();
-            renderGallery();
-            showToast("Foto capturada y geo-etiquetada con éxito.");
-        }
+function drawTrack() {
+  const w = canvas.width = canvas.clientWidth * devicePixelRatio;
+  const h = canvas.height = 380 * devicePixelRatio;
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  ctx.clearRect(0, 0, canvas.clientWidth, 380);
 
-        // Local Storage & Gallery Rendering
-        const STORAGE_KEY = 'geocam_pro_gallery';
+  const pad = 30;
+  const rangeX = Math.max(maxX - minX, 1);
+  const rangeY = Math.max(maxY - minY, 1);
+  const scale = Math.min((canvas.clientWidth - 2 * pad) / rangeX, (380 - 2 * pad) / rangeY);
 
-        function saveGalleryToStorage() {
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(gallery));
-            } catch (e) {
-                showToast("Espacio local insuficiente para guardar más fotos.", 'error');
-            }
-        }
+  const px = vx => pad + (vx - minX) * scale;
+  const py = vy => 380 - pad - (vy - minY) * scale;
 
-        function loadGalleryFromStorage() {
-            const data = localStorage.getItem(STORAGE_KEY);
-            if (data) {
-                try {
-                    gallery = JSON.parse(data);
-                    renderGallery();
-                } catch (e) {
-                    gallery = [];
-                }
-            }
-        }
+  // Norte verdadero: arriba del lienzo.
+  ctx.strokeStyle = '#8b949e';
+  ctx.beginPath();
+  ctx.moveTo(canvas.clientWidth - 40, 330);
+  ctx.lineTo(canvas.clientWidth - 40, 250);
+  ctx.stroke();
+  ctx.fillStyle = '#8b949e';
+  ctx.font = '12px system-ui';
+  ctx.fillText('N', canvas.clientWidth - 45, 240);
 
-        function renderGallery() {
-            galleryGrid.innerHTML = '';
-            galleryCount.textContent = `${gallery.length} foto${gallery.length !== 1 ? 's' : ''}`;
+  if (records.length < 2) return;
 
-            if (gallery.length === 0) {
-                galleryEmpty.classList.remove('hidden');
-                clearGalleryBtn.classList.add('hidden');
-                return;
-            }
+  ctx.strokeStyle = '#58a6ff';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(px(records[0].x), py(records[0].y));
 
-            galleryEmpty.classList.add('hidden');
-            clearGalleryBtn.classList.remove('hidden');
+  for (const r of records) ctx.lineTo(px(r.x), py(r.y));
+  ctx.stroke();
 
-            gallery.forEach((item) => {
-                const card = document.createElement('div');
-                card.className = 'bg-slate-50 dark:bg-slate-900/50 rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800 flex flex-col group';
-                card.innerHTML = `
-                    <div class="relative aspect-[16/10] overflow-hidden bg-slate-900 cursor-pointer" onclick="openModal(${item.id})">
-                        <img src="${item.dataUrl}" alt="Captura GPS" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
-                        <div class="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded font-mono">
-                            ±${item.accuracy.toFixed(1)}m
-                        </div>
-                    </div>
-                    <div class="p-3 flex flex-col flex-1 justify-between gap-2">
-                        <div>
-                            <span class="text-[10px] text-slate-400 block">${item.date}</span>
-                            <span class="text-xs font-mono font-medium text-slate-700 dark:text-slate-300 block truncate">
-                                ${item.lat.toFixed(5)}, ${item.lon.toFixed(5)}
-                            </span>
-                        </div>
-                        <div class="flex items-center justify-between pt-2 border-t border-slate-200/50 dark:border-slate-800">
-                            <button onclick="openModal(${item.id})" class="text-xs text-indigo-600 dark:text-indigo-400 font-medium hover:underline flex items-center gap-1">
-                                <i class="fa-solid fa-magnifying-glass"></i> Ver detalle
-                            </button>
-                            <button onclick="deletePhoto(${item.id})" class="text-xs text-red-500 hover:text-red-700 p-1" title="Eliminar foto">
-                                <i class="fa-solid fa-trash-can"></i>
-                            </button>
-                        </div>
-                    </div>
-                `;
-                galleryGrid.appendChild(card);
-            });
-        }
+  const first = records[0], last = records[records.length - 1];
+  ctx.fillStyle = '#3fb950';
+  ctx.beginPath(); ctx.arc(px(first.x), py(first.y), 5, 0, Math.PI * 2); ctx.fill();
 
-        function deletePhoto(id) {
-            gallery = gallery.filter(item => item.id !== id);
-            saveGalleryToStorage();
-            renderGallery();
-            showToast("Imagen eliminada de la galería.");
-        }
+  ctx.fillStyle = '#f85149';
+  ctx.beginPath(); ctx.arc(px(last.x), py(last.y), 5, 0, Math.PI * 2); ctx.fill();
+}
 
-        function clearGallery() {
-            if (confirm("¿Estás seguro de eliminar todas las fotos de la galería local?")) {
-                gallery = [];
-                saveGalleryToStorage();
-                renderGallery();
-                showToast("Galería limpiada.");
-            }
-        }
+function exportCsv() {
+  if (!records.length) return;
 
-        // Modal Handling
-        function openModal(id) {
-            const item = gallery.find(p => p.id === id);
-            if (!item) return;
+  const header = 'paso,tiempo_ms,delta_t_ms,velocidad_m_s,acelerometro_x,acelerometro_y,acelerometro_z,giroscopio_x,giroscopio_y,giroscopio_z,rumbo_verdadero_grados,x_m,y_m\n';
+  const rows = records.map(r => [
+    r.step, r.t, r.dt, r.speed.toFixed(2),
+    r.ax.toFixed(2), r.ay.toFixed(2), r.az.toFixed(2),
+    r.gx.toFixed(2), r.gy.toFixed(2), r.gz.toFixed(2),
+    r.heading === null ? '' : r.heading.toFixed(2),
+    r.x.toFixed(2), r.y.toFixed(2)
+  ].join(',')).join('\n');
 
-            document.getElementById('modal-img').src = item.dataUrl;
-            document.getElementById('modal-date').textContent = item.date;
-            document.getElementById('modal-accuracy').textContent = `${item.accuracy.toFixed(1)} metros`;
-            document.getElementById('modal-coords').textContent = `${item.lat.toFixed(6)}, ${item.lon.toFixed(6)} (Alt: ${item.altitude.toFixed(1)}m)`;
-            
-            const downloadBtn = document.getElementById('modal-download');
-            downloadBtn.onclick = function() {
-                const a = document.createElement('a');
-                a.href = item.dataUrl;
-                a.download = `geocam_${item.lat.toFixed(4)}_${item.lon.toFixed(4)}.jpg`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                showToast("Imagen descargada.");
-            };
+  const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'trayectoria_pasos.csv';
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
-            document.getElementById('image-modal').classList.remove('hidden');
-        }
+$('startBtn').onclick = requestSensors;
+$('stopBtn').onclick = stopListening;
+$('exportBtn').onclick = exportCsv;
+$('clearBtn').onclick = () => {
+  records = [];
+  lastStepTime = null;
+  x = y = minX = maxX = minY = maxY = 0;
+  $('steps').textContent = '0';
+  $('speed').textContent = '0.00 m/s';
+  $('distance').textContent = '0.00 m';
+  $('interval').textContent = '-- ms';
+  $('log').innerHTML = '';
+  drawTrack();
+};
 
-        function closeModal() {
-            document.getElementById('image-modal').classList.add('hidden');
-        }
-    </script>
+window.addEventListener('resize', drawTrack);
+drawTrack();
+</script>
 </body>
 </html>
