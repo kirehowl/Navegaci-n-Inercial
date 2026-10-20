@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Registro Inercial y Trayectoria PDR</title>
+<title>Registro Inercial Unificado (200ms + Pasos)</title>
 <style>
   :root { color-scheme: dark; }
   body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: #0d1117; color: #e6edf3; }
-  main { padding: 16px; max-width: 900px; margin: auto; }
+  main { padding: 16px; max-width: 950px; margin: auto; }
   h1 { font-size: 1.25rem; text-align: center; color: #38bdf8; margin-bottom: 16px; }
   h2 { font-size: 1.05rem; border-bottom: 1px solid #30363d; padding-bottom: 6px; margin-top: 20px; color: #7dd3fc; }
   
@@ -32,7 +32,7 @@
 
   canvas { width: 100%; height: 380px; background: #010409; border: 1px solid #30363d; border-radius: 10px; margin-top: 8px; display: block; }
 
-  .table-container { overflow-x: auto; margin-top: 10px; border: 1px solid #30363d; border-radius: 8px; max-height: 280px; }
+  .table-container { overflow-x: auto; margin-top: 10px; border: 1px solid #30363d; border-radius: 8px; max-height: 300px; }
   table { width: 100%; border-collapse: collapse; font-size: .8rem; font-family: monospace; white-space: nowrap; }
   th, td { border-bottom: 1px solid #21262d; padding: 6px 10px; text-align: center; }
   th { background: #161b22; color: #7dd3fc; position: sticky; top: 0; z-index: 1; }
@@ -44,19 +44,19 @@
 </head>
 <body>
 <main>
-  <h1>Registro de Pasos, Sensores y Trayectoria Autocorregida</h1>
+  <h1>Registro Unificado (Muestreo 200 ms + Detección de Pasos)</h1>
 
-  <!-- Dashboard de Mediciones Instantáneas -->
+  <!-- Dashboard -->
   <div class="grid">
     <div class="card"><div class="label">Conteo de Pasos</div><div class="value highlight" id="step-count">0</div></div>
     <div class="card"><div class="label">Estado</div><div class="value warning" id="state-val">Detenido</div></div>
     <div class="card"><div class="label">Rumbo (Geográfico)</div><div class="value" id="heading-val">--</div></div>
     <div class="card"><div class="label">Zancada Actual</div><div class="value" id="stride-val">0.750 m</div></div>
-    <div class="card"><div class="label">Acelerómetro (X,Y,Z)</div><div class="value" style="font-size: 0.85rem;" id="acc-val">-0.01, -0.01, -0.01</div></div>
-    <div class="card"><div class="label">Giroscopio (X,Y,Z)</div><div class="value" style="font-size: 0.85rem;" id="gyro-val">0.01, 0.01, 0.01</div></div>
+    <div class="card"><div class="label">Acelerómetro (X,Y,Z)</div><div class="value" style="font-size: 0.85rem;" id="acc-val">0.00, 0.00, 0.00</div></div>
+    <div class="card"><div class="label">Giroscopio (X,Y,Z)</div><div class="value" style="font-size: 0.85rem;" id="gyro-val">0.00, 0.00, 0.00</div></div>
   </div>
 
-  <!-- Parámetros Configurables -->
+  <!-- Parámetros -->
   <div class="card inputs-grid">
     <div>
       <label class="label">Zancada Mínima (m)</label>
@@ -67,7 +67,7 @@
       <input id="maxStride" type="number" step="0.001" value="0.981">
     </div>
     <div>
-      <label class="label">Declinación Magnética (°) ohne símbolo</label>
+      <label class="label">Declinación Magnética (°)</label>
       <input id="declination" type="number" step="0.1" value="6.5">
     </div>
   </div>
@@ -80,17 +80,17 @@
     <button class="reset" id="resetBtn">Limpiar / Reiniciar</button>
   </div>
 
-  <!-- Mapa con Autocorrección de Vista -->
-  <h2>Recorrido Realizado (Autocorrección Continua de Encuadre)</h2>
+  <!-- Mapa -->
+  <h2>Recorrido Realizado (Autocorrección Continua)</h2>
   <canvas id="map"></canvas>
 
-  <!-- Título con Formato Solicitado -->
-  <h2 id="table-title">Registro de Pasos [--------:------]</h2>
+  <!-- Tabla Unificada -->
+  <h2 id="table-title">Registro General [--------:------] (Cada 200 ms + Match de Paso)</h2>
   <div class="table-container">
     <table>
       <thead>
         <tr>
-          <th>Paso</th>
+          <th>ID Registro</th>
           <th>Tiempo (ms)</th>
           <th>AccX</th>
           <th>AccY</th>
@@ -99,6 +99,7 @@
           <th>GyrY</th>
           <th>GyrZ</th>
           <th>Rumbo</th>
+          <th>Paso Match</th>
         </tr>
       </thead>
       <tbody id="log"></tbody>
@@ -106,7 +107,7 @@
   </div>
 
   <p class="note">
-    <strong>Nota:</strong> Los datos se registran puramente en formato numérico (milisegundos transcurridos desde el inicio, sin signos positivos explícitos y sin símbolos de unidades) para facilitar el análisis directo tras la exportación.
+    <strong>Nota:</strong> El sistema realiza un muestreo independiente cada 200 ms guardando el estado actual de los sensores. Si en ese intervalo ocurre una zancada, la columna <strong>Paso Match</strong> registra el número de paso correspondiente; de lo contrario, se mantiene vacía.
   </p>
 </main>
 
@@ -115,19 +116,21 @@ const $ = id => document.getElementById(id);
 const canvas = $('map'), ctx = canvas.getContext('2d');
 
 let running = false;
-let records = [];
+let records = [];         // Almacena todos los registros de 200 ms
+let stepCounter = 0;
+let totalSteps = 0;
 
-let sessionStartTimestamp = null; // Para generar el formato [aaaammdd:hhmmss]
-let sessionStartMs = 0;         // Para medir los milisegundos transcurridos
+let sessionStartTimestamp = null;
+let sessionStartMs = 0;
+let sampleInterval = null; // Timer para los 200 ms
 
-let lastStepTime = 0;
 let lastPeakTime = 0;
 let lastMagnitude = 9.81;
 let peakArmed = true;
 
 let currentHeading = null;
-let currentAcc = { x: -0.01, y: -0.01, z: -0.01 };
-let currentGyro = { x: 0.01, y: 0.01, z: 0.01 };
+let currentAcc = { x: 0.00, y: 0.00, z: 0.00 };
+let currentGyro = { x: 0.00, y: 0.00, z: 0.00 };
 
 let x = 0, y = 0;
 let minX = -1, maxX = 1, minY = -1, maxY = 1;
@@ -160,23 +163,33 @@ function startListening() {
   sessionStartTimestamp = formatSessionDate(now);
   sessionStartMs = performance.now();
 
-  $('table-title').textContent = `Registro de Pasos [${sessionStartTimestamp}]`;
+  $('table-title').textContent = `Registro General [${sessionStartTimestamp}] (Cada 200 ms + Match de Paso)`;
 
   window.addEventListener('devicemotion', onMotion);
   window.addEventListener('deviceorientation', onOrientation);
   if ('ondeviceorientationabsolute' in window) {
     window.addEventListener('deviceorientationabsolute', onOrientation);
   }
+
   running = true;
   $('startBtn').disabled = true;
   $('stopBtn').disabled = false;
   $('exportBtn').disabled = false;
+
+  // Iniciar el registro independiente cada 200 ms
+  sampleInterval = setInterval(recordSampleData, 200);
 }
 
 function stopListening() {
   window.removeEventListener('devicemotion', onMotion);
   window.removeEventListener('deviceorientation', onOrientation);
   window.removeEventListener('deviceorientationabsolute', onOrientation);
+  
+  if (sampleInterval) {
+    clearInterval(sampleInterval);
+    sampleInterval = null;
+  }
+
   running = false;
   $('startBtn').disabled = false;
   $('stopBtn').disabled = true;
@@ -185,7 +198,6 @@ function stopListening() {
 
 function onOrientation(event) {
   let heading = null;
-
   if (typeof event.webkitCompassHeading === 'number') {
     heading = event.webkitCompassHeading;
   } else if (typeof event.alpha === 'number') {
@@ -205,15 +217,14 @@ function onMotion(event) {
   const a = event.accelerationIncludingGravity || {};
   const g = event.rotationRate || {};
 
-  currentAcc.x = a.x ?? -0.01;
-  currentAcc.y = a.y ?? -0.01;
-  currentAcc.z = a.z ?? -0.01;
+  currentAcc.x = a.x ?? 0.00;
+  currentAcc.y = a.y ?? 0.00;
+  currentAcc.z = a.z ?? 0.00;
 
-  currentGyro.x = g.alpha ?? 0.01;
-  currentGyro.y = g.beta ?? 0.01;
-  currentGyro.z = g.gamma ?? 0.01;
+  currentGyro.x = g.alpha ?? 0.00;
+  currentGyro.y = g.beta ?? 0.00;
+  currentGyro.z = g.gamma ?? 0.00;
 
-  // Visualización numérica limpia (sin signo + forzado, salvo el negativo si aplica)
   $('acc-val').textContent = `${currentAcc.x.toFixed(2)}, ${currentAcc.y.toFixed(2)}, ${currentAcc.z.toFixed(2)}`;
   $('gyro-val').textContent = `${currentGyro.x.toFixed(2)}, ${currentGyro.y.toFixed(2)}, ${currentGyro.z.toFixed(2)}`;
 
@@ -223,6 +234,9 @@ function onMotion(event) {
   detectStep(t, magnitude);
 }
 
+// Bandera temporal para indicar si en este ciclo de 200ms ocurrió un paso
+let stepOccurredInCycle = null;
+
 function detectStep(t, magnitude) {
   const rising = magnitude > lastMagnitude;
   const isPeak = peakArmed && rising && magnitude > 11.2;
@@ -231,6 +245,7 @@ function detectStep(t, magnitude) {
   if (isPeak && cooldownPassed) {
     peakArmed = false;
     lastPeakTime = t;
+    totalSteps++;
 
     const minS = parseFloat($('minStride').value || 0.679);
     const maxS = parseFloat($('maxStride').value || 0.981);
@@ -248,30 +263,11 @@ function detectStep(t, magnitude) {
       maxY = Math.max(maxY, y);
     }
 
-    // Tiempo transcurrido en milisegundos desde el inicio de la sesión
-    const elapsedMs = Math.round(t - sessionStartMs);
-
-    const record = {
-      step: records.length + 1,
-      timeMs: elapsedMs,
-      accX: currentAcc.x,
-      accY: currentAcc.y,
-      accZ: currentAcc.z,
-      gyrX: currentGyro.x,
-      gyrY: currentGyro.y,
-      gyrZ: currentGyro.z,
-      heading: currentHeading !== null ? currentHeading.toFixed(1) : '',
-      x, y
-    };
-
-    records.push(record);
-    lastStepTime = t;
-
-    $('step-count').textContent = records.length;
+    $('step-count').textContent = totalSteps;
     $('stride-val').textContent = stride.toFixed(3) + ' m';$('state-val').textContent = 'En movimiento 🚶‍♂️';
     $('state-val').className = 'value highlight';
 
-    addRow(record);
+    stepOccurredInCycle = totalSteps;
     drawMap();
 
     setTimeout(() => peakArmed = true, 120);
@@ -281,8 +277,33 @@ function detectStep(t, magnitude) {
   lastMagnitude = magnitude;
 }
 
+// Función ejecutada cada 200 ms de forma independiente
+function recordSampleData() {
+  const elapsedMs = Math.round(performance.now() - sessionStartMs);
+  
+  const record = {
+    id: records.length + 1,
+    timeMs: elapsedMs,
+    accX: currentAcc.x,
+    accY: currentAcc.y,
+    accZ: currentAcc.z,
+    gyrX: currentGyro.x,
+    gyrY: currentGyro.y,
+    gyrZ: currentGyro.z,
+    heading: currentHeading !== null ? currentHeading.toFixed(1) : '',
+    stepMatch: stepOccurredInCycle !== null ? stepOccurredInCycle : ''
+  };
+
+  records.push(record);
+  addRow(record);
+
+  // Limpiar la bandera de paso para el siguiente intervalo de 200ms
+  stepOccurredInCycle = null;
+}
+
+// Evaluar si se detuvo tras 1.8 segundos sin pasos
 setInterval(() => {
-  if (running && lastStepTime > 0 && (performance.now() - lastStepTime) > 1800) {
+  if (running && lastPeakTime > 0 && (performance.now() - lastPeakTime) > 1800) {
     $('state-val').textContent = 'Detenido 🛑';
     $('state-val').className = 'value warning';
   }
@@ -292,7 +313,7 @@ function addRow(r) {
   const tbody = $('log');
   const tr = document.createElement('tr');
   tr.innerHTML = `
-    <td>${r.step}</td>
+    <td>${r.id}</td>
     <td>${r.timeMs}</td>
     <td>${r.accX.toFixed(2)}</td>
     <td>${r.accY.toFixed(2)}</td>
@@ -301,8 +322,14 @@ function addRow(r) {
     <td>${r.gyrY.toFixed(2)}</td>
     <td>${r.gyrZ.toFixed(2)}</td>
     <td>${r.heading}</td>
+    <td style="color: ${r.stepMatch !== '' ? '#4ade80' : '#8b949e'}; font-weight: ${r.stepMatch !== '' ? 'bold' : 'normal'};">${r.stepMatch}</td>
   `;
   tbody.prepend(tr);
+
+  // Limitar visualización en tabla a los últimos 100 registros para no sobrecargar el DOM
+  if (tbody.children.length > 100) {
+    tbody.lastChild.remove();
+  }
 }
 
 function drawMap() {
@@ -339,43 +366,51 @@ function drawMap() {
   ctx.font = '12px system-ui';
   ctx.fillText('N', displayWidth - 34, 15);
 
-  if (records.length === 0) {
+  // Reconstruir la ruta basada en los pasos detectados guardados en los registros
+  const stepRecords = records.filter(r => r.stepMatch !== '');
+  
+  if (stepRecords.length === 0) {
     ctx.fillStyle = '#4ade80';
     ctx.beginPath(); ctx.arc(px(0), py(0), 6, 0, Math.PI * 2); ctx.fill();
     return;
   }
 
+  // Recalcular posiciones X, Y para graficar
+  let trackX = 0, trackY = 0;
   ctx.strokeStyle = '#38bdf8';
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(px(0), py(0));
 
-  for (const r of records) {
-    ctx.lineTo(px(r.x), py(r.y));
-  }
+  // Asignar zancadas aproximadas para el mapa
+  stepRecords.forEach(sr => {
+    // Estimación visual basada en los pasos guardados
+    trackX += 0.75 * Math.sin(parseFloat(sr.heading || 0) * Math.PI / 180);
+    trackY += 0.75 * Math.cos(parseFloat(sr.heading || 0) * Math.PI / 180);
+    ctx.lineTo(px(trackX), py(trackY));
+  });
   ctx.stroke();
 
   ctx.fillStyle = '#238636';
   ctx.beginPath(); ctx.arc(px(0), py(0), 5, 0, Math.PI * 2); ctx.fill();
 
-  const last = records[records.length - 1];
   ctx.fillStyle = '#4ade80';
-  ctx.beginPath(); ctx.arc(px(last.x), py(last.y), 6, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(px(trackX), py(trackY), 6, 0, Math.PI * 2); ctx.fill();
 }
 
 function exportCSV() {
   if (!records.length) return;
 
-  const header = 'Paso,Tiempo_ms,AccX,AccY,AccZ,GyrX,GyrY,GyrZ,Rumbo\n';
+  const header = 'ID_Registro,Tiempo_ms,AccX,AccY,AccZ,GyrX,GyrY,GyrZ,Rumbo,Paso_Match\n';
   const rows = records.map(r => 
-    `${r.step},${r.timeMs},${r.accX.toFixed(2)},${r.accY.toFixed(2)},${r.accZ.toFixed(2)},${r.gyrX.toFixed(2)},${r.gyrY.toFixed(2)},${r.gyrZ.toFixed(2)},${r.heading}`
+    `${r.id},${r.timeMs},${r.accX.toFixed(2)},${r.accY.toFixed(2)},${r.accZ.toFixed(2)},${r.gyrX.toFixed(2)},${r.gyrY.toFixed(2)},${r.gyrZ.toFixed(2)},${r.heading},${r.stepMatch}`
   ).join('\n');
 
   const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `registro_pasos_${sessionStartTimestamp || 'sesion'}.csv`;
+  a.download = `registro_unificado_${sessionStartTimestamp || 'sesion'}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -383,14 +418,16 @@ function exportCSV() {
 function resetAll() {
   stopListening();
   records = [];
+  totalSteps = 0;
+  stepCounter = 0;
   x = y = 0;
   minX = -1; maxX = 1; minY = -1; maxY = 1;
-  lastStepTime = 0;
   sessionStartTimestamp = null;
   sessionStartMs = 0;
+  
   $('step-count').textContent = '0';$('state-val').textContent = 'Detenido';
   $('state-val').className = 'value warning';$('stride-val').textContent = '0.750 m';
-  $('table-title').textContent = 'Registro de Pasos [--------:------]';$('log').innerHTML = '';
+  $('table-title').textContent = 'Registro General [--------:------] (Cada 200 ms + Match de Paso)';$('log').innerHTML = '';
   drawMap();
 }
 
