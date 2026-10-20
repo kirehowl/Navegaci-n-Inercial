@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Registro Inercial Unificado (50ms + Pasos)</title>
+<title>Registro Inercial Unificado (50ms + 3 Decimales)</title>
 <style>
   :root { color-scheme: dark; }
   body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: #0d1117; color: #e6edf3; }
@@ -44,16 +44,16 @@
 </head>
 <body>
 <main>
-  <h1>Registro Unificado (Muestreo 50 ms + Detección de Pasos)</h1>
+  <h1>Registro Unificado (Muestreo 50 ms + Sensores a 3 Decimales)</h1>
 
   <!-- Dashboard -->
   <div class="grid">
     <div class="card"><div class="label">Conteo de Pasos</div><div class="value highlight" id="step-count">0</div></div>
     <div class="card"><div class="label">Estado</div><div class="value warning" id="state-val">Detenido</div></div>
-    <div class="card"><div class="label">Rumbo (Geográfico)</div><div class="value" id="heading-val">--</div></div>
+    <div class="card"><div class="label">Rumbo (Magnetómetro)</div><div class="value" id="heading-val">--</div></div>
     <div class="card"><div class="label">Zancada Actual</div><div class="value" id="stride-val">0.750 m</div></div>
-    <div class="card"><div class="label">Acelerómetro (X,Y,Z)</div><div class="value" style="font-size: 0.85rem;" id="acc-val">0.00, 0.00, 0.00</div></div>
-    <div class="card"><div class="label">Giroscopio (X,Y,Z)</div><div class="value" style="font-size: 0.85rem;" id="gyro-val">0.00, 0.00, 0.00</div></div>
+    <div class="card"><div class="label">Acelerómetro (X,Y,Z)</div><div class="value" style="font-size: 0.8rem;" id="acc-val">0.000, 0.000, 0.000</div></div>
+    <div class="card"><div class="label">Giroscopio (X,Y,Z)</div><div class="value" style="font-size: 0.8rem;" id="gyro-val">0.000, 0.000, 0.000</div></div>
   </div>
 
   <!-- Parámetros -->
@@ -90,8 +90,8 @@
     <table>
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Time [ms]</th>
+          <th>ID Registro</th>
+          <th>Tiempo (ms)</th>
           <th>AccX</th>
           <th>AccY</th>
           <th>AccZ</th>
@@ -107,7 +107,7 @@
   </div>
 
   <p class="note">
-    <strong>Nota:</strong> El sistema realiza un muestreo independiente cada <strong>50 ms</strong> guardando el estado actual de los sensores. Si en ese intervalo ocurre una zancada, la columna <strong>Paso Match</strong> registra el número de paso correspondiente.
+    <strong>Nota:</strong> Los datos del acelerómetro, giroscopio y rumbo (magnetómetro) se almacenan estrictamente con <strong>3 decimales</strong> de precisión en cada ciclo de 50 ms.
   </p>
 </main>
 
@@ -121,15 +121,15 @@ let totalSteps = 0;
 
 let sessionStartTimestamp = null;
 let sessionStartMs = 0;
-let sampleInterval = null; // Timer configurado a 50 ms
+let sampleInterval = null; 
 
 let lastPeakTime = 0;
 let lastMagnitude = 9.81;
 let peakArmed = true;
 
 let currentHeading = null;
-let currentAcc = { x: 0.00, y: 0.00, z: 0.00 };
-let currentGyro = { x: 0.00, y: 0.00, z: 0.00 };
+let currentAcc = { x: 0.000, y: 0.000, z: 0.000 };
+let currentGyro = { x: 0.000, y: 0.000, z: 0.000 };
 
 let x = 0, y = 0;
 let minX = -1, maxX = 1, minY = -1, maxY = 1;
@@ -175,7 +175,6 @@ function startListening() {
   $('stopBtn').disabled = false;
   $('exportBtn').disabled = false;
 
-  // Iniciar el registro independiente cada 50 ms
   sampleInterval = setInterval(recordSampleData, 50);
 }
 
@@ -206,7 +205,7 @@ function onOrientation(event) {
   if (heading !== null) {
     const declination = parseFloat($('declination').value || 0);
     currentHeading = (heading + declination + 360) % 360;
-    $('heading-val').textContent = currentHeading.toFixed(1);
+    $('heading-val').textContent = currentHeading.toFixed(3);
   }
 }
 
@@ -216,16 +215,16 @@ function onMotion(event) {
   const a = event.accelerationIncludingGravity || {};
   const g = event.rotationRate || {};
 
-  currentAcc.x = a.x ?? 0.00;
-  currentAcc.y = a.y ?? 0.00;
-  currentAcc.z = a.z ?? 0.00;
+  currentAcc.x = a.x ?? 0.000;
+  currentAcc.y = a.y ?? 0.000;
+  currentAcc.z = a.z ?? 0.000;
 
-  currentGyro.x = g.alpha ?? 0.00;
-  currentGyro.y = g.beta ?? 0.00;
-  currentGyro.z = g.gamma ?? 0.00;
+  currentGyro.x = g.alpha ?? 0.000;
+  currentGyro.y = g.beta ?? 0.000;
+  currentGyro.z = g.gamma ?? 0.000;
 
-  $('acc-val').textContent = `${currentAcc.x.toFixed(2)}, ${currentAcc.y.toFixed(2)}, ${currentAcc.z.toFixed(2)}`;
-  $('gyro-val').textContent = `${currentGyro.x.toFixed(2)}, ${currentGyro.y.toFixed(2)}, ${currentGyro.z.toFixed(2)}`;
+  $('acc-val').textContent = `${currentAcc.x.toFixed(3)}, ${currentAcc.y.toFixed(3)}, ${currentAcc.z.toFixed(3)}`;
+  $('gyro-val').textContent = `${currentGyro.x.toFixed(3)}, ${currentGyro.y.toFixed(3)}, ${currentGyro.z.toFixed(3)}`;
 
   const magnitude = Math.sqrt(currentAcc.x ** 2 + currentAcc.y ** 2 + currentAcc.z ** 2);
   const t = performance.now();
@@ -275,7 +274,6 @@ function detectStep(t, magnitude) {
   lastMagnitude = magnitude;
 }
 
-// Función ejecutada cada 50 ms de forma independiente
 function recordSampleData() {
   const elapsedMs = Math.round(performance.now() - sessionStartMs);
   
@@ -288,7 +286,7 @@ function recordSampleData() {
     gyrX: currentGyro.x,
     gyrY: currentGyro.y,
     gyrZ: currentGyro.z,
-    heading: currentHeading !== null ? currentHeading.toFixed(1) : '',
+    heading: currentHeading !== null ? currentHeading.toFixed(3) : '',
     stepMatch: stepOccurredInCycle !== null ? stepOccurredInCycle : ''
   };
 
@@ -311,18 +309,17 @@ function addRow(r) {
   tr.innerHTML = `
     <td>${r.id}</td>
     <td>${r.timeMs}</td>
-    <td>${r.accX.toFixed(2)}</td>
-    <td>${r.accY.toFixed(2)}</td>
-    <td>${r.accZ.toFixed(2)}</td>
-    <td>${r.gyrX.toFixed(2)}</td>
-    <td>${r.gyrY.toFixed(2)}</td>
-    <td>${r.gyrZ.toFixed(2)}</td>
+    <td>${r.accX.toFixed(3)}</td>
+    <td>${r.accY.toFixed(3)}</td>
+    <td>${r.accZ.toFixed(3)}</td>
+    <td>${r.gyrX.toFixed(3)}</td>
+    <td>${r.gyrY.toFixed(3)}</td>
+    <td>${r.gyrZ.toFixed(3)}</td>
     <td>${r.heading}</td>
     <td style="color: ${r.stepMatch !== '' ? '#4ade80' : '#8b949e'}; font-weight: ${r.stepMatch !== '' ? 'bold' : 'normal'};">${r.stepMatch}</td>
   `;
   tbody.prepend(tr);
 
-  // Mantener un límite visible en la tabla para optimizar rendimiento de renderizado en DOM
   if (tbody.children.length > 150) {
     tbody.lastChild.remove();
   }
@@ -395,7 +392,7 @@ function exportCSV() {
 
   const header = 'ID_Registro,Tiempo_ms,AccX,AccY,AccZ,GyrX,GyrY,GyrZ,Rumbo,Paso_Match\n';
   const rows = records.map(r => 
-    `${r.id},${r.timeMs},${r.accX.toFixed(2)},${r.accY.toFixed(2)},${r.accZ.toFixed(2)},${r.gyrX.toFixed(2)},${r.gyrY.toFixed(2)},${r.gyrZ.toFixed(2)},${r.heading},${r.stepMatch}`
+    `${r.id},${r.timeMs},${r.accX.toFixed(3)},${r.accY.toFixed(3)},${r.accZ.toFixed(3)},${r.gyrX.toFixed(3)},${r.gyrY.toFixed(3)},${r.gyrZ.toFixed(3)},${r.heading},${r.stepMatch}`
   ).join('\n');
 
   const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
