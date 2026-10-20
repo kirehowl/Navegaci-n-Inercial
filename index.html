@@ -44,16 +44,16 @@
 </head>
 <body>
 <main>
-  <h1>Registro de Pasos, Sensores y Trayectoria Autocorrregida</h1>
+  <h1>Registro de Pasos, Sensores y Trayectoria Autocorregida</h1>
 
   <!-- Dashboard de Mediciones Instantáneas -->
   <div class="grid">
     <div class="card"><div class="label">Conteo de Pasos</div><div class="value highlight" id="step-count">0</div></div>
     <div class="card"><div class="label">Estado</div><div class="value warning" id="state-val">Detenido</div></div>
-    <div class="card"><div class="label">Rumbo (Geográfico)</div><div class="value" id="heading-val">--°</div></div>
+    <div class="card"><div class="label">Rumbo (Geográfico)</div><div class="value" id="heading-val">--</div></div>
     <div class="card"><div class="label">Zancada Actual</div><div class="value" id="stride-val">0.750 m</div></div>
     <div class="card"><div class="label">Acelerómetro (X,Y,Z)</div><div class="value" style="font-size: 0.85rem;" id="acc-val">-0.01, -0.01, -0.01</div></div>
-    <div class="card"><div class="label">Giroscopio (X,Y,Z)</div><div class="value" style="font-size: 0.85rem;" id="gyro-val">+0.01, +0.01, +0.01</div></div>
+    <div class="card"><div class="label">Giroscopio (X,Y,Z)</div><div class="value" style="font-size: 0.85rem;" id="gyro-val">0.01, 0.01, 0.01</div></div>
   </div>
 
   <!-- Parámetros Configurables -->
@@ -67,7 +67,7 @@
       <input id="maxStride" type="number" step="0.001" value="0.981">
     </div>
     <div>
-      <label class="label">Declinación Magnética (°)</label>
+      <label class="label">Declinación Magnética (°) ohne símbolo</label>
       <input id="declination" type="number" step="0.1" value="6.5">
     </div>
   </div>
@@ -84,14 +84,14 @@
   <h2>Recorrido Realizado (Autocorrección Continua de Encuadre)</h2>
   <canvas id="map"></canvas>
 
-  <!-- Tabla de Registros -->
-  <h2>Registro de Pasos</h2>
+  <!-- Título con Formato Solicitado -->
+  <h2 id="table-title">Registro de Pasos [--------:------]</h2>
   <div class="table-container">
     <table>
       <thead>
         <tr>
           <th>Paso</th>
-          <th>Tiempo</th>
+          <th>Tiempo (ms)</th>
           <th>AccX</th>
           <th>AccY</th>
           <th>AccZ</th>
@@ -106,7 +106,7 @@
   </div>
 
   <p class="note">
-    <strong>Nota:</strong> El mapa calcula dinámicamente los límites del recorrido en cada paso para asegurar que toda la ruta se mantenga siempre visible dentro del recuadro. Los datos del acelerómetro y giroscopio se capturan exactamente al momento de dar cada paso.
+    <strong>Nota:</strong> Los datos se registran puramente en formato numérico (milisegundos transcurridos desde el inicio, sin signos positivos explícitos y sin símbolos de unidades) para facilitar el análisis directo tras la exportación.
   </p>
 </main>
 
@@ -117,6 +117,9 @@ const canvas = $('map'), ctx = canvas.getContext('2d');
 let running = false;
 let records = [];
 
+let sessionStartTimestamp = null; // Para generar el formato [aaaammdd:hhmmss]
+let sessionStartMs = 0;         // Para medir los milisegundos transcurridos
+
 let lastStepTime = 0;
 let lastPeakTime = 0;
 let lastMagnitude = 9.81;
@@ -126,13 +129,17 @@ let currentHeading = null;
 let currentAcc = { x: -0.01, y: -0.01, z: -0.01 };
 let currentGyro = { x: 0.01, y: 0.01, z: 0.01 };
 
-// Posición y límites dinámicos para autocorrección de vista
 let x = 0, y = 0;
 let minX = -1, maxX = 1, minY = -1, maxY = 1;
 
-function getTimestamp() {
-  const d = new Date();
-  return d.toTimeString().split(' ')[0] + '.' + String(d.getMilliseconds()).padStart(3, '0');
+function formatSessionDate(date) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const hh = String(date.getHours()).padStart(2, '0');
+  const min = String(date.getMinutes()).padStart(2, '0');
+  const ss = String(date.getSeconds()).padStart(2, '0');
+  return `${yyyy}${mm}${dd}:${hh}${min}${ss}`;
 }
 
 function requestSensors() {
@@ -149,6 +156,12 @@ function requestSensors() {
 }
 
 function startListening() {
+  const now = new Date();
+  sessionStartTimestamp = formatSessionDate(now);
+  sessionStartMs = performance.now();
+
+  $('table-title').textContent = `Registro de Pasos [${sessionStartTimestamp}]`;
+
   window.addEventListener('devicemotion', onMotion);
   window.addEventListener('deviceorientation', onOrientation);
   if ('ondeviceorientationabsolute' in window) {
@@ -174,15 +187,15 @@ function onOrientation(event) {
   let heading = null;
 
   if (typeof event.webkitCompassHeading === 'number') {
-    heading = event.webkitCompassHeading; // iOS (Norte geográfico)
+    heading = event.webkitCompassHeading;
   } else if (typeof event.alpha === 'number') {
-    heading = (360 - event.alpha) % 360; // Android/Chrome (Aproximación)
+    heading = (360 - event.alpha) % 360;
   }
 
   if (heading !== null) {
     const declination = parseFloat($('declination').value || 0);
     currentHeading = (heading + declination + 360) % 360;
-    $('heading-val').textContent = currentHeading.toFixed(1) + '°';
+    $('heading-val').textContent = currentHeading.toFixed(1);
   }
 }
 
@@ -200,12 +213,12 @@ function onMotion(event) {
   currentGyro.y = g.beta ?? 0.01;
   currentGyro.z = g.gamma ?? 0.01;
 
-  // Actualizar UI instantánea
-  $('acc-val').textContent = `${currentAcc.x >= 0 ? '+' : ''}${currentAcc.x.toFixed(2)}, ${currentAcc.y >= 0 ? '+' : ''}${currentAcc.y.toFixed(2)}, ${currentAcc.z >= 0 ? '+' : ''}${currentAcc.z.toFixed(2)}`;
-  $('gyro-val').textContent = `${currentGyro.x >= 0 ? '+' : ''}${currentGyro.x.toFixed(2)}, ${currentGyro.y >= 0 ? '+' : ''}${currentGyro.y.toFixed(2)}, ${currentGyro.z >= 0 ? '+' : ''}${currentGyro.z.toFixed(2)}`;
+  // Visualización numérica limpia (sin signo + forzado, salvo el negativo si aplica)
+  $('acc-val').textContent = `${currentAcc.x.toFixed(2)}, ${currentAcc.y.toFixed(2)}, ${currentAcc.z.toFixed(2)}`;
+  $('gyro-val').textContent = `${currentGyro.x.toFixed(2)}, ${currentGyro.y.toFixed(2)}, ${currentGyro.z.toFixed(2)}`;
 
   const magnitude = Math.sqrt(currentAcc.x ** 2 + currentAcc.y ** 2 + currentAcc.z ** 2);
-  const t = Date.now();
+  const t = performance.now();
 
   detectStep(t, magnitude);
 }
@@ -219,44 +232,41 @@ function detectStep(t, magnitude) {
     peakArmed = false;
     lastPeakTime = t;
 
-    // Calcular Zancada Adaptativa basada en el impacto
     const minS = parseFloat($('minStride').value || 0.679);
     const maxS = parseFloat($('maxStride').value || 0.981);
-    
-    // Normalizar fuerza entre umbrales 11.2 y 16 m/s²
     const factor = Math.min(Math.max((magnitude - 11.2) / (16.0 - 11.2), 0), 1);
     const stride = minS + factor * (maxS - minS);
 
-    // Calcular desplazamiento
     if (currentHeading !== null) {
       const rad = currentHeading * Math.PI / 180;
       x += stride * Math.sin(rad);
       y += stride * Math.cos(rad);
       
-      // Autocorrección de límites para el canvas
       minX = Math.min(minX, x);
       maxX = Math.max(maxX, x);
       minY = Math.min(minY, y);
       maxY = Math.max(maxY, y);
     }
 
+    // Tiempo transcurrido en milisegundos desde el inicio de la sesión
+    const elapsedMs = Math.round(t - sessionStartMs);
+
     const record = {
       step: records.length + 1,
-      time: getTimestamp(),
+      timeMs: elapsedMs,
       accX: currentAcc.x,
       accY: currentAcc.y,
       accZ: currentAcc.z,
       gyrX: currentGyro.x,
       gyrY: currentGyro.y,
       gyrZ: currentGyro.z,
-      heading: currentHeading !== null ? currentHeading.toFixed(1) + '°' : '--°',
+      heading: currentHeading !== null ? currentHeading.toFixed(1) : '',
       x, y
     };
 
     records.push(record);
     lastStepTime = t;
 
-    // Actualizar Panel
     $('step-count').textContent = records.length;
     $('stride-val').textContent = stride.toFixed(3) + ' m';$('state-val').textContent = 'En movimiento 🚶‍♂️';
     $('state-val').className = 'value highlight';
@@ -271,9 +281,8 @@ function detectStep(t, magnitude) {
   lastMagnitude = magnitude;
 }
 
-// Evaluación periódica para saber si se ha detenido
 setInterval(() => {
-  if (running && lastStepTime > 0 && (Date.now() - lastStepTime) > 1800) {
+  if (running && lastStepTime > 0 && (performance.now() - lastStepTime) > 1800) {
     $('state-val').textContent = 'Detenido 🛑';
     $('state-val').className = 'value warning';
   }
@@ -284,19 +293,18 @@ function addRow(r) {
   const tr = document.createElement('tr');
   tr.innerHTML = `
     <td>${r.step}</td>
-    <td>${r.time}</td>
-    <td>${r.accX >= 0 ? '+' : ''}${r.accX.toFixed(2)}</td>
-    <td>${r.accY >= 0 ? '+' : ''}${r.accY.toFixed(2)}</td>
-    <td>${r.accZ >= 0 ? '+' : ''}${r.accZ.toFixed(2)}</td>
-    <td>${r.gyrX >= 0 ? '+' : ''}${r.gyrX.toFixed(2)}</td>
-    <td>${r.gyrY >= 0 ? '+' : ''}${r.gyrY.toFixed(2)}</td>
-    <td>${r.gyrZ >= 0 ? '+' : ''}${r.gyrZ.toFixed(2)}</td>
+    <td>${r.timeMs}</td>
+    <td>${r.accX.toFixed(2)}</td>
+    <td>${r.accY.toFixed(2)}</td>
+    <td>${r.accZ.toFixed(2)}</td>
+    <td>${r.gyrX.toFixed(2)}</td>
+    <td>${r.gyrY.toFixed(2)}</td>
+    <td>${r.gyrZ.toFixed(2)}</td>
     <td>${r.heading}</td>
   `;
   tbody.prepend(tr);
 }
 
-// Renderizado del Mapa con Autocorrección Continua de Escala
 function drawMap() {
   const width = canvas.width = canvas.clientWidth * devicePixelRatio;
   const height = canvas.height = 380 * devicePixelRatio;
@@ -307,19 +315,14 @@ function drawMap() {
 
   ctx.clearRect(0, 0, displayWidth, displayHeight);
 
-  // Margen de seguridad (padding)
   const pad = 40;
   const rangeX = Math.max(maxX - minX, 2); 
   const rangeY = Math.max(maxY - minY, 2);
-
-  // Escala automática que se reajusta para contener todo el recorrido
   const scale = Math.min((displayWidth - 2 * pad) / rangeX, (displayHeight - 2 * pad) / rangeY);
 
-  // Funciones de transformación de coordenadas reales (metros) a píxeles
   const px = realX => displayWidth / 2 + (realX - (minX + maxX) / 2) * scale;
   const py = realY => displayHeight / 2 - (realY - (minY + maxY) / 2) * scale;
 
-  // Dibujar Rejilla / Ejes
   ctx.strokeStyle = '#21262d';
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -327,7 +330,6 @@ function drawMap() {
   ctx.moveTo(0, py(0)); ctx.lineTo(displayWidth, py(0));
   ctx.stroke();
 
-  // Indicador de Norte Verdadero / Geográfico
   ctx.strokeStyle = '#8b949e';
   ctx.beginPath();
   ctx.moveTo(displayWidth - 30, 50);
@@ -338,13 +340,11 @@ function drawMap() {
   ctx.fillText('N', displayWidth - 34, 15);
 
   if (records.length === 0) {
-    // Dibujar punto inicial
     ctx.fillStyle = '#4ade80';
     ctx.beginPath(); ctx.arc(px(0), py(0), 6, 0, Math.PI * 2); ctx.fill();
     return;
   }
 
-  // Dibujar Ruta Trazada
   ctx.strokeStyle = '#38bdf8';
   ctx.lineWidth = 3;
   ctx.beginPath();
@@ -355,11 +355,9 @@ function drawMap() {
   }
   ctx.stroke();
 
-  // Punto Inicial (Verde)
   ctx.fillStyle = '#238636';
   ctx.beginPath(); ctx.arc(px(0), py(0), 5, 0, Math.PI * 2); ctx.fill();
 
-  // Punto Actual / Posición Final (Verde Brillante)
   const last = records[records.length - 1];
   ctx.fillStyle = '#4ade80';
   ctx.beginPath(); ctx.arc(px(last.x), py(last.y), 6, 0, Math.PI * 2); ctx.fill();
@@ -368,16 +366,16 @@ function drawMap() {
 function exportCSV() {
   if (!records.length) return;
 
-  const header = 'Paso,Tiempo,AccX,AccY,AccZ,GyrX,GyrY,GyrZ,Rumbo\n';
+  const header = 'Paso,Tiempo_ms,AccX,AccY,AccZ,GyrX,GyrY,GyrZ,Rumbo\n';
   const rows = records.map(r => 
-    `${r.step},${r.time},${r.accX.toFixed(2)},${r.accY.toFixed(2)},${r.accZ.toFixed(2)},${r.gyrX.toFixed(2)},${r.gyrY.toFixed(2)},${r.gyrZ.toFixed(2)},${r.heading}`
+    `${r.step},${r.timeMs},${r.accX.toFixed(2)},${r.accY.toFixed(2)},${r.accZ.toFixed(2)},${r.gyrX.toFixed(2)},${r.gyrY.toFixed(2)},${r.gyrZ.toFixed(2)},${r.heading}`
   ).join('\n');
 
   const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `registro_pasos_${Date.now()}.csv`;
+  a.download = `registro_pasos_${sessionStartTimestamp || 'sesion'}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -388,13 +386,14 @@ function resetAll() {
   x = y = 0;
   minX = -1; maxX = 1; minY = -1; maxY = 1;
   lastStepTime = 0;
-  $('step-count').textContent = '0';
-  $('state-val').textContent = 'Detenido';$('state-val').className = 'value warning';
-  $('stride-val').textContent = '0.750 m';$('log').innerHTML = '';
+  sessionStartTimestamp = null;
+  sessionStartMs = 0;
+  $('step-count').textContent = '0';$('state-val').textContent = 'Detenido';
+  $('state-val').className = 'value warning';$('stride-val').textContent = '0.750 m';
+  $('table-title').textContent = 'Registro de Pasos [--------:------]';$('log').innerHTML = '';
   drawMap();
 }
 
-// Asignación de Eventos
 $('startBtn').onclick = requestSensors;
 $('stopBtn').onclick = stopListening;
 $('exportBtn').onclick = exportCSV;
