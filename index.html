@@ -90,8 +90,8 @@
     <table>
       <thead>
         <tr>
-          <th>ID Registro</th>
-          <th>Tiempo (ms)</th>
+          <th>ID</th>
+          <th>Time</th>
           <th>AccX</th>
           <th>AccY</th>
           <th>AccZ</th>
@@ -99,7 +99,7 @@
           <th>GyrY</th>
           <th>GyrZ</th>
           <th>Rumbo</th>
-          <th>Paso Match</th>
+          <th>Paso</th>
         </tr>
       </thead>
       <tbody id="log"></tbody>
@@ -205,7 +205,7 @@ function onOrientation(event) {
   if (heading !== null) {
     const declination = parseFloat($('declination').value || 0);
     currentHeading = (heading + declination + 360) % 360;
-    $('heading-val').textContent = currentHeading.toFixed(3);
+    $('heading-val').textContent = currentHeading.toFixed(1);
   }
 }
 
@@ -223,8 +223,8 @@ function onMotion(event) {
   currentGyro.y = g.beta ?? 0.000;
   currentGyro.z = g.gamma ?? 0.000;
 
-  $('acc-val').textContent = `${currentAcc.x.toFixed(3)}, ${currentAcc.y.toFixed(3)}, ${currentAcc.z.toFixed(3)}`;
-  $('gyro-val').textContent = `${currentGyro.x.toFixed(3)}, ${currentGyro.y.toFixed(3)}, ${currentGyro.z.toFixed(3)}`;
+  $('acc-val').textContent = `${currentAcc.x.toFixed(1)}, ${currentAcc.y.toFixed(1)}, ${currentAcc.z.toFixed(1)}`;
+  $('gyro-val').textContent = `${currentGyro.x.toFixed(1)}, ${currentGyro.y.toFixed(1)}, ${currentGyro.z.toFixed(1)}`;
 
   const magnitude = Math.sqrt(currentAcc.x ** 2 + currentAcc.y ** 2 + currentAcc.z ** 2);
   const t = performance.now();
@@ -261,7 +261,7 @@ function detectStep(t, magnitude) {
     }
 
     $('step-count').textContent = totalSteps;
-    $('stride-val').textContent = stride.toFixed(3) + ' m';$('state-val').textContent = 'En movimiento 🚶‍♂️';
+    $('stride-val').textContent = stride.toFixed(1) + ' m';$('state-val').textContent = 'En movimiento 🚶‍♂️';
     $('state-val').className = 'value highlight';
 
     stepOccurredInCycle = totalSteps;
@@ -286,7 +286,7 @@ function recordSampleData() {
     gyrX: currentGyro.x,
     gyrY: currentGyro.y,
     gyrZ: currentGyro.z,
-    heading: currentHeading !== null ? currentHeading.toFixed(3) : '',
+    heading: currentHeading !== null ? currentHeading.toFixed(1) : '',
     stepMatch: stepOccurredInCycle !== null ? stepOccurredInCycle : ''
   };
 
@@ -309,12 +309,12 @@ function addRow(r) {
   tr.innerHTML = `
     <td>${r.id}</td>
     <td>${r.timeMs}</td>
-    <td>${r.accX.toFixed(3)}</td>
-    <td>${r.accY.toFixed(3)}</td>
-    <td>${r.accZ.toFixed(3)}</td>
-    <td>${r.gyrX.toFixed(3)}</td>
-    <td>${r.gyrY.toFixed(3)}</td>
-    <td>${r.gyrZ.toFixed(3)}</td>
+    <td>${r.accX.toFixed(1)}</td>
+    <td>${r.accY.toFixed(1)}</td>
+    <td>${r.accZ.toFixed(1)}</td>
+    <td>${r.gyrX.toFixed(1)}</td>
+    <td>${r.gyrY.toFixed(1)}</td>
+    <td>${r.gyrZ.toFixed(1)}</td>
     <td>${r.heading}</td>
     <td style="color: ${r.stepMatch !== '' ? '#4ade80' : '#8b949e'}; font-weight: ${r.stepMatch !== '' ? 'bold' : 'normal'};">${r.stepMatch}</td>
   `;
@@ -390,16 +390,16 @@ function drawMap() {
 function exportCSV() {
   if (!records.length) return;
 
-  const header = 'ID_Registro,Tiempo_ms,AccX,AccY,AccZ,GyrX,GyrY,GyrZ,Rumbo,Paso_Match\n';
+  const header = 'ID,Time,AccX,AccY,AccZ,GyrX,GyrY,GyrZ,Rumbo,Paso\n';
   const rows = records.map(r => 
-    `${r.id},${r.timeMs},${r.accX.toFixed(3)},${r.accY.toFixed(3)},${r.accZ.toFixed(3)},${r.gyrX.toFixed(3)},${r.gyrY.toFixed(3)},${r.gyrZ.toFixed(3)},${r.heading},${r.stepMatch}`
+    `${r.id},${r.timeMs},${r.accX.toFixed(1)},${r.accY.toFixed(1)},${r.accZ.toFixed(1)},${r.gyrX.toFixed(1)},${r.gyrY.toFixed(1)},${r.gyrZ.toFixed(1)},${r.heading},${r.stepMatch}`
   ).join('\n');
 
   const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `registro_unificado_${sessionStartTimestamp || 'sesion'}.csv`;
+  a.download = `PDR_${sessionStartTimestamp || 'sesion'}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
