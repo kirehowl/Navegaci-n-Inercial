@@ -3,429 +3,1002 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Registro Inercial Unificado (50ms + 3 Decimales)</title>
+<title>Registro Unificado v2 (50 ms · 3 decimales · PDR)</title>
 <style>
   :root { color-scheme: dark; }
   body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: #0d1117; color: #e6edf3; }
-  main { padding: 16px; max-width: 950px; margin: auto; }
-  h1 { font-size: 1.25rem; text-align: center; color: #38bdf8; margin-bottom: 16px; }
-  h2 { font-size: 1.05rem; border-bottom: 1px solid #30363d; padding-bottom: 6px; margin-top: 20px; color: #7dd3fc; }
-  
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-  .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
-  .label { font-size: .75rem; color: #8b949e; }
-  .value { font-size: 1.15rem; font-weight: 700; color: #38bdf8; margin-top: 2px; }
-  .highlight { color: #4ade80; }
-  .warning { color: #f59e0b; }
+  main { padding: 14px; max-width: 1100px; margin: auto; }
+  h1 { font-size: 1.2rem; text-align: center; color: #38bdf8; margin: 6px 0 2px; }
+  h2 { font-size: 1rem; border-bottom: 1px solid #30363d; padding-bottom: 6px; margin-top: 22px; color: #7dd3fc; }
+  .sub { text-align: center; color: #8b949e; font-size: .78rem; margin: 0 0 14px; }
 
-  .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 12px; }
-  input { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: #e6edf3; box-sizing: border-box; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); gap: 10px; }
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 10px 12px; box-shadow: 0 4px 6px rgba(0,0,0,.25); }
+  .label { font-size: .72rem; color: #8b949e; text-transform: uppercase; letter-spacing: .04em; }
+  .value { font-size: 1.1rem; font-weight: 700; color: #38bdf8; margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .value.sm { font-size: .82rem; }
+  .highlight { color: #4ade80; } .warning { color: #f59e0b; } .dim { color: #8b949e; }
+  .sub2 { font-size: .68rem; color: #6e7681; margin-top: 2px; }
 
-  .btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
-  button { border: 0; border-radius: 8px; padding: 10px 14px; font-weight: 700; cursor: pointer; flex: 1; min-width: 120px; font-size: 0.85rem; }
-  .start { background: #238636; color: white; }
-  .start:disabled { background: #1b4b27; color: #6e7681; cursor: not-allowed; }
-  .stop { background: #da3633; color: white; }
-  .stop:disabled { background: #60201f; color: #6e7681; cursor: not-allowed; }
-  .export { background: #1f6feb; color: white; }
-  .reset { background: #30363d; color: white; }
+  .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 10px; margin-top: 10px; }
+  input, select { width: 100%; padding: 7px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: #e6edf3; box-sizing: border-box; font-size: .85rem; }
+  input:focus, select:focus { outline: 1px solid #38bdf8; }
+  .check { display: flex; align-items: center; gap: 6px; font-size: .78rem; color: #8b949e; }
+  .check input { width: auto; }
 
-  canvas { width: 100%; height: 380px; background: #010409; border: 1px solid #30363d; border-radius: 10px; margin-top: 8px; display: block; }
+  .btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 8px; }
+  button { border: 0; border-radius: 8px; padding: 10px 13px; font-weight: 700; cursor: pointer; flex: 1; min-width: 108px; font-size: .82rem; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .start { background: #238636; color: #fff; } .stop { background: #da3633; color: #fff; }
+  .export { background: #1f6feb; color: #fff; } .reset { background: #30363d; color: #fff; }
+  .calib { background: #8957e5; color: #fff; } .aux { background: #21262d; color: #e6edf3; border: 1px solid #30363d; }
 
-  .table-container { overflow-x: auto; margin-top: 10px; border: 1px solid #30363d; border-radius: 8px; max-height: 300px; }
-  table { width: 100%; border-collapse: collapse; font-size: .8rem; font-family: monospace; white-space: nowrap; }
-  th, td { border-bottom: 1px solid #21262d; padding: 6px 10px; text-align: center; }
+  .statusbar { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: .74rem; color: #8b949e; background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 8px 10px; }
+  .statusbar b { color: #c9d1d9; font-weight: 600; }
+  .pill { display: inline-block; padding: 1px 7px; border-radius: 999px; background: #21262d; color: #7dd3fc; font-size: .68rem; }
+
+  canvas { width: 100%; height: 400px; background: #010409; border: 1px solid #30363d; border-radius: 10px; margin-top: 8px; display: block; touch-action: none; cursor: grab; }
+  canvas:active { cursor: grabbing; }
+  .map-tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+  .map-tools button { flex: 0 0 auto; min-width: 0; padding: 6px 12px; }
+
+  .table-container { overflow: auto; margin-top: 10px; border: 1px solid #30363d; border-radius: 8px; max-height: 340px; }
+  table { width: 100%; border-collapse: collapse; font-size: .76rem; font-family: ui-monospace, monospace; white-space: nowrap; }
+  th, td { border-bottom: 1px solid #21262d; padding: 5px 9px; text-align: right; }
   th { background: #161b22; color: #7dd3fc; position: sticky; top: 0; z-index: 1; }
-  tr:nth-child(even) { background-color: #0d1117; }
-  tr:nth-child(odd) { background-color: #161b22; }
+  td.id, td.step { text-align: center; }
+  tr:nth-child(even) { background: #0d1117; } tr:nth-child(odd) { background: #161b22; }
 
-  .note { color: #8b949e; font-size: .8rem; margin-top: 10px; line-height: 1.4; }
+  .note { color: #8b949e; font-size: .78rem; line-height: 1.5; }
+  .note code { background: #161b22; border: 1px solid #30363d; border-radius: 4px; padding: 0 4px; }
+  details { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 12px; margin-top: 14px; }
+  summary { cursor: pointer; color: #7dd3fc; font-size: .85rem; font-weight: 600; }
+  .banner { background: #1f2d1f; border: 1px solid #238636; border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: .8rem; }
+  .banner button { flex: 0 0 auto; min-width: 0; padding: 6px 12px; margin-left: 8px; }
+  .toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: #21262d; border: 1px solid #30363d; color: #e6edf3; padding: 9px 16px; border-radius: 999px; font-size: .8rem; z-index: 9; opacity: 0; transition: opacity .25s; pointer-events: none; }
+  .toast.show { opacity: 1; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Registro Unificado (Muestreo 50 ms + Sensores a 3 Decimales)</h1>
+  <h1>Registro Unificado v2 — Muestreo 50 ms · 3 decimales</h1>
+  <p class="sub">PDR: detección de pasos con pico preservado · rumbo gyro+magnetómetro · ZUPT · persistencia IndexedDB</p>
 
-  <!-- Dashboard -->
-  <div class="grid">
-    <div class="card"><div class="label">Conteo de Pasos</div><div class="value highlight" id="step-count">0</div></div>
-    <div class="card"><div class="label">Estado</div><div class="value warning" id="state-val">Detenido</div></div>
-    <div class="card"><div class="label">Rumbo (Magnetómetro)</div><div class="value" id="heading-val">--</div></div>
-    <div class="card"><div class="label">Zancada Actual</div><div class="value" id="stride-val">0.750 m</div></div>
-    <div class="card"><div class="label">Acelerómetro (X,Y,Z)</div><div class="value" style="font-size: 0.8rem;" id="acc-val">0.000, 0.000, 0.000</div></div>
-    <div class="card"><div class="label">Giroscopio (X,Y,Z)</div><div class="value" style="font-size: 0.8rem;" id="gyro-val">0.000, 0.000, 0.000</div></div>
+  <div id="restoreBanner" class="banner" style="display:none">
+    <span id="restoreInfo">Hay una sesión anterior guardada.</span>
+    <button class="aux" id="restoreBtn">Restaurar</button>
+    <button class="aux" id="discardBtn">Descartar</button>
   </div>
 
-  <!-- Parámetros -->
+  <!-- ============ DASHBOARD ============ -->
+  <div class="grid">
+    <div class="card"><div class="label">Pasos</div><div class="value highlight" id="step-count">0</div><div class="sub2" id="cadence-sub">— ppm</div></div>
+    <div class="card"><div class="label">Estado</div><div class="value warning" id="state-val">Detenido</div><div class="sub2" id="state-sub">sin sesión</div></div>
+    <div class="card"><div class="label">Distancia</div><div class="value" id="dist-val">0.000 m</div><div class="sub2" id="zancada-sub">zancada 0.750 m</div></div>
+    <div class="card"><div class="label">Rumbo (fusionado)</div><div class="value" id="heading-val">--</div><div class="sub2" id="heading-src">sin fuente</div></div>
+    <div class="card"><div class="label">Norte magnético</div><div class="value sm" id="compass-val">--</div><div class="sub2" id="compass-sub">magnetómetro</div></div>
+    <div class="card"><div class="label">Acelerómetro</div><div class="value sm" id="acc-val">0.000, 0.000, 0.000</div><div class="sub2" id="acc-sub">con gravedad</div></div>
+    <div class="card"><div class="label">Giroscopio (ejes dispositivo)</div><div class="value sm" id="gyro-val">0.000, 0.000, 0.000</div><div class="sub2" id="gyro-sub">ωx, ωy, ωz</div></div>
+    <div class="card"><div class="label">Yaw (vertical)</div><div class="value sm" id="yaw-val">0.000 °/s</div><div class="sub2" id="quiet-sub">—</div></div>
+    <div class="card"><div class="label">Frecuencia sensor</div><div class="value sm" id="hz-val">0 Hz</div><div class="sub2" id="sig-sub">sin señal</div></div>
+    <div class="card"><div class="label">Confianza rumbo</div><div class="value sm" id="conf-val">--</div><div class="sub2" id="conf-sub">—</div></div>
+  </div>
+
+  <!-- ============ PARÁMETROS ============ -->
   <div class="card inputs-grid">
     <div>
-      <label class="label">Zancada Mínima (m)</label>
-      <input id="minStride" type="number" step="0.001" value="0.679">
+      <label class="label">Zancada mínima (m)</label>
+      <input id="minStride" type="number" step="0.001" min="0.2" max="2.5" value="0.679">
     </div>
     <div>
-      <label class="label">Zancada Máxima (m)</label>
-      <input id="maxStride" type="number" step="0.001" value="0.981">
+      <label class="label">Zancada máxima (m)</label>
+      <input id="maxStride" type="number" step="0.001" min="0.2" max="2.5" value="0.981">
     </div>
     <div>
-      <label class="label">Declinación Magnética (°)</label>
+      <label class="label">Declinación magnética (°)</label>
       <input id="declination" type="number" step="0.1" value="6.5">
+      <div class="sub2">Solo se aplica en magnetómetro crudo (Android)</div>
+    </div>
+    <div>
+      <label class="label">Postura del móvil</label>
+      <select id="posture">
+        <option value="auto">Auto (usa β/γ del sensor)</option>
+        <option value="vertical">Vertical (β=90°)</option>
+        <option value="plano">Plano / horizontal (β=0°)</option>
+      </select>
+    </div>
+    <div>
+      <label class="label">Filtro de zancada (EMA)</label>
+      <input id="emaAlpha" type="number" step="0.05" min="0.05" max="1" value="0.30">
+    </div>
+    <div style="display:flex; flex-direction:column; gap:6px; justify-content:center">
+      <label class="check"><input type="checkbox" id="invertYaw"> Invertir signo de giro</label>
+      <label class="check"><input type="checkbox" id="autoFit" checked> Auto-ajustar el mapa</label>
     </div>
   </div>
 
-  <!-- Controles -->
+  <!-- ============ CONTROLES ============ -->
   <div class="btn-group">
-    <button class="start" id="startBtn">Iniciar Sensores</button>
+    <button class="start" id="startBtn">Iniciar sensores</button>
     <button class="stop" id="stopBtn" disabled>Detener</button>
+    <button class="calib" id="calibBtn">Calibrar rumbo</button>
     <button class="export" id="exportBtn" disabled>Exportar CSV</button>
     <button class="reset" id="resetBtn">Limpiar / Reiniciar</button>
   </div>
 
-  <!-- Mapa -->
-  <h2>Recorrido Realizado (Autocorrección Continua)</h2>
-  <canvas id="map"></canvas>
+  <div class="statusbar">
+    <span>Sesión: <b id="sess-val">--------</b></span>
+    <span>Ventana: <b id="win-val">50 ms</b></span>
+    <span>Decimales: <b>3</b></span>
+    <span>Muestras: <b id="rec-val">0</b></span>
+    <span>Modo acc: <b id="mode-val">—</b></span>
+    <span class="pill" id="db-val">persistencia: —</span>
+  </div>
 
-  <!-- Tabla Unificada -->
-  <h2 id="table-title">Registro General [--------:------] (Cada 50 ms + Match de Paso)</h2>
+  <!-- ============ MAPA ============ -->
+  <h2>Recorrido realizado</h2>
+  <canvas id="map"></canvas>
+  <div class="map-tools">
+    <button class="aux" id="zoomIn">Zoom +</button>
+    <button class="aux" id="zoomOut">Zoom −</button>
+    <button class="aux" id="centerBtn">Centrar</button>
+    <span class="note" id="map-info">Arrastra para desplazar · rueda para zoom · el eje azul marca el rumbo actual</span>
+  </div>
+
+  <!-- ============ TABLA ============ -->
+  <h2 id="table-title">Registro general [--------] (cada 50 ms · pico preservado)</h2>
   <div class="table-container">
     <table>
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Time</th>
-          <th>AccX</th>
-          <th>AccY</th>
-          <th>AccZ</th>
-          <th>GyrX</th>
-          <th>GyrY</th>
-          <th>GyrZ</th>
-          <th>Rumbo</th>
-          <th>Paso</th>
+          <th>ID</th><th>t (ms)</th><th>AccX</th><th>AccY</th><th>AccZ</th><th>|lin|</th>
+          <th>ωx</th><th>ωy</th><th>ωz</th><th>Yaw°/s</th><th>Rumbo</th><th>Paso</th><th>X</th><th>Y</th>
         </tr>
       </thead>
       <tbody id="log"></tbody>
     </table>
   </div>
 
-  <p class="note">
-    <strong>Nota:</strong> Los datos del acelerómetro, giroscopio y rumbo (magnetómetro) se almacenan estrictamente con <strong>3 decimales</strong> de precisión en cada ciclo de 50 ms.
-  </p>
+  <details>
+    <summary>Notas técnicas / qué cambió respecto a v1</summary>
+    <div class="note">
+      <p><strong>Precisión.</strong> Los valores se guardan internamente con precisión completa de <code>float</code>;
+      la pantalla y el CSV los muestran con <strong>exactamente 3 decimales</strong> (v1 usaba 1 decimal).</p>
+
+      <p><strong>Muestreo con pico preservado.</strong> <code>devicemotion</code> entrega ~60 Hz. En v1 se guardaba
+      únicamente la última muestra de cada ventana de 50 ms, por lo que el pico de impacto (que dura 20–40 ms)
+      se perdía en la tabla y en el CSV. Ahora se conserva la muestra de <strong>máxima magnitud lineal</strong> de
+      cada ventana, mientras la <em>detección</em> de pasos sigue corriendo a la frecuencia nativa del sensor.</p>
+
+      <p><strong>Detector de pasos.</strong> Umbral adaptativo (media + 1.4·σ sobre los últimos ~1.5 s),
+      <strong>histéresis real</strong> (hay que bajar del 55 % del umbral para rearmar, no basta con que baje un
+      instante como en v1) y periodo refractario de 260 ms.</p>
+
+      <p><strong>Compensación de inclinación.</strong> Se estima la gravedad con un filtro de paso bajo (EMA α=0.90)
+      y se resta, de modo que el umbral ya no depende de cómo se sujeta el móvil.</p>
+
+      <p><strong>Rumbo real.</strong> v1 usaba <code>alpha</code> de <code>deviceorientation</code>, que es
+      <em>relativo</em> a la orientación de arranque del sensor (no es norte). Ahora:
+      (1) el giroscopio se integra con la matriz de rotación correcta según la postura del móvil,
+      (2) el magnetómetro corrige lentamente al giroscopio (filtro complementario),
+      (3) en iOS <code>webkitCompassHeading</code> ya viene en <em>norte verdadero</em>, por lo que ya <u>no</u> se
+      le suma la declinación (en v1 se corregía dos veces, con 6.5° de error).</p>
+
+      <p><strong>ZUPT.</strong> Cuando el usuario está quieto (aceleración lineal ~0 y giro ~0 durante 1.2 s) se
+      congela la deriva del giroscopio.</p>
+
+      <p><strong>Permisos iOS 13+.</strong> Ahora se piden <code>DeviceMotionEvent</code> <em>y</em>
+      <code>DeviceOrientationEvent</code>; con v1 el magnetómetro nunca llegaba a dar datos en iPhone.</p>
+
+      <p><strong>Otras correcciones.</strong> Nombre de CSV sin «:» (inválido en Windows), mapa y trayectoria
+      calculados con la <em>misma</em> zancada real (v1 dibujaba con 0.75 m fijo y divergía del cálculo real),
+      tabla actualizada por lotes (v1 insertaba 20 filas/s con innerHTML), temporizador con corrección de deriva,
+      pausa/reanudación con <code>visibilitychange</code>, estado completo reiniciado al parar y persistencia en
+      IndexedDB para no perder la sesión al recargar.</p>
+    </div>
+  </details>
 </main>
 
+<div class="toast" id="toast"></div>
+
 <script>
+'use strict';
+
+/* ========================= CONFIGURACIÓN ========================= */
+const SAMPLE_MS   = 50;      // ventana del registro (ms)
+const DEC         = 3;       // decimales de salida
+const GRAV_ALPHA  = 0.90;    // LPF de gravedad
+const DB_NAME     = 'pdr-log-v2';
+const ST_RECORDS  = 'records';
+const ST_STEPS    = 'steps';
+
 const $ = id => document.getElementById(id);
-const canvas = $('map'), ctx = canvas.getContext('2d');
+const clamp = (v,a,b) => v < a ? a : (v > b ? b : v);
+const num   = v => (typeof v === 'number' && Number.isFinite(v)) ? v : 0;
+const toRad = d => d * Math.PI / 180;
+const circDiff = (a,b) => ((b - a + 540) % 360) - 180;          // -180..180
+const circLerp = (a,b,t) => (a + circDiff(a,b) * t + 360) % 360;
+const fmt  = (v,d = DEC) => (v === null || v === undefined || Number.isNaN(v)) ? '' : Number(v).toFixed(d);
+const avg  = a => a.length ? a.reduce((x,y) => x + y, 0) / a.length : 0;
+const std  = a => { if (a.length < 2) return 0; const m = avg(a);
+                    return Math.sqrt(a.reduce((x,y) => x + (y-m)*(y-m), 0) / (a.length - 1)); };
 
-let running = false;
-let records = [];         
-let totalSteps = 0;
+const canvas = $('map');
+const ctx    = canvas.getContext('2d');
 
-let sessionStartTimestamp = null;
-let sessionStartMs = 0;
-let sampleInterval = null; 
+/* ========================= ESTADO ========================= */
+const S = {
+  running: false,
+  records: [],            // log de 50 ms
+  steps: [],              // eventos de paso
+  totalSteps: 0,
+  totalDistance: 0,
+  lastStride: 0.75,
+  strideEMA: 0.75,
 
-let lastPeakTime = 0;
-let lastMagnitude = 9.81;
-let peakArmed = true;
+  sessionStart: null,
+  sessionStartMs: 0,
+  timer: null,
+  lastTick: 0,
+  pendingStep: null,
+  stepSeq: 0,
 
-let currentHeading = null;
-let currentAcc = { x: 0.000, y: 0.000, z: 0.000 };
-let currentGyro = { x: 0.000, y: 0.000, z: 0.000 };
+  // brújula / giroscopio
+  beta: 90, gamma: 0,                 // postura (Auto los actualiza desde el sensor)
+  haveTilt: false,
+  compass: null,                      // rumbo del magnetómetro (grados)
+  compassTrue: false,                 // ¿ya viene en norte verdadero? (iOS)
+  compassWeight: 0,                   // peso de la corrección complementaria
+  gyroH: null,                        // heading integrado (absoluto)
+  gyroInit: false,
+  gyroBias: 0,
+  headingOffset: 0,                   // calibración del usuario (0 = calibrado)
+  heading: null,                      // heading fusionado ya compensado
+  headingSource: '—',
+  lastYawRate: 0,
 
-let x = 0, y = 0;
-let minX = -1, maxX = 1, minY = -1, maxY = 1;
+  // detector
+  gravity: { x:0, y:0, z:0 },
+  linMag: 0,
+  linX: 0, linY: 0, linZ: 0,
+  hist: [],
+  stepActive: false,
+  stepPeak: 0,
+  stepPeakT: 0,
+  stepStartT: 0,
+  lastStepT: 0,
+  thrHigh: 1.2,
+  thrLow: 0.6,
+  accMode: 'none',
 
-function formatSessionDate(date) {
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
-  const hh = String(date.getHours()).padStart(2, '0');
-  const min = String(date.getMinutes()).padStart(2, '0');
-  const ss = String(date.getSeconds()).padStart(2, '0');
-  return `${yyyy}${mm}${dd}:${hh}${min}${ss}`;
+  // quiet / ZUPT
+  quietSince: null,
+
+  // sensores
+  motionCount: 0,
+  lastMotionT: 0,
+  hzMark: performance.now(),
+  hz: 0,
+  orientationCount: 0,
+
+  // trayectoria
+  x: 0, y: 0,
+  minX: -1, maxX: 1, minY: -1, maxY: 1,
+  view: { zoom: 1, ox: 0, oy: 0, manual: false },
+
+  // persistencia
+  db: null, persistedRec: 0, persistedStep: 0
+};
+
+const rawBuf = [];   // muestras crudas del sensor dentro de la ventana actual
+let lastSample = { t:0, ax:0, ay:0, az:0, wx:0, wy:0, wz:0, lin:0, yaw:0 };
+
+/* ========================= UTILIDADES UI ========================= */
+let toastTimer = null;
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+function fmtSession(d) {
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 }
 
-function requestSensors() {
-  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-    DeviceMotionEvent.requestPermission()
-      .then(state => {
-        if (state === 'granted') startListening();
-        else alert('Permiso de sensores denegado.');
-      })
-      .catch(err => alert('Error al solicitar permiso: ' + err.message));
-  } else {
-    startListening();
+/* ========================= PERMISOS ========================= */
+async function requestSensors() {
+  const need = [];
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function')
+    need.push(DeviceMotionEvent);
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function')
+    need.push(DeviceOrientationEvent);           // iOS 13+: necesario para el magnetómetro
+
+  if (need.length) {
+    try {
+      const res = await Promise.all(need.map(E => E.requestPermission()));
+      if (!res.every(r => r === 'granted')) { toast('Permiso de sensores denegado'); return; }
+    } catch (e) { toast('Error al pedir permiso: ' + e.message); return; }
   }
+  startListening();
 }
 
+/* ========================= CICLO DE VIDA ========================= */
 function startListening() {
+  if (S.running) return;
   const now = new Date();
-  sessionStartTimestamp = formatSessionDate(now);
-  sessionStartMs = performance.now();
+  S.sessionStart  = fmtSession(now);
+  S.sessionStartMs = performance.now();
+  S.lastTick       = performance.now();
+  $('table-title').textContent = `Registro general [${S.sessionStart}] (cada 50 ms · pico preservado)`;
 
-  $('table-title').textContent = `Registro General [${sessionStartTimestamp}] (Cada 50 ms + Match de Paso)`;
+  window.addEventListener('devicemotion', onMotion, { passive: true });
+  window.addEventListener('deviceorientation', onOrientation, { passive: true });
+  if ('ondeviceorientationabsolute' in window)
+    window.addEventListener('deviceorientationabsolute', onOrientationAbsolute, { passive: true });
 
-  window.addEventListener('devicemotion', onMotion);
-  window.addEventListener('deviceorientation', onOrientation);
-  if ('ondeviceorientationabsolute' in window) {
-    window.addEventListener('deviceorientationabsolute', onOrientation);
-  }
-
-  running = true;
+  S.running = true;
   $('startBtn').disabled = true;
-  $('stopBtn').disabled = false;
+  $('stopBtn').disabled  = false;
   $('exportBtn').disabled = false;
-
-  sampleInterval = setInterval(recordSampleData, 50);
+  setState('En marcha', 'sub2 highlight');
+  scheduleTick();
 }
 
 function stopListening() {
   window.removeEventListener('devicemotion', onMotion);
   window.removeEventListener('deviceorientation', onOrientation);
-  window.removeEventListener('deviceorientationabsolute', onOrientation);
-  
-  if (sampleInterval) {
-    clearInterval(sampleInterval);
-    sampleInterval = null;
-  }
-
-  running = false;
+  window.removeEventListener('deviceorientationabsolute', onOrientationAbsolute);
+  if (S.timer) { clearTimeout(S.timer); S.timer = null; }
+  S.running = false;
   $('startBtn').disabled = false;
-  $('stopBtn').disabled = true;
-  $('state-val').textContent = 'Detenido';$('state-val').className = 'value warning';
+  $('stopBtn').disabled  = true;
+  setState('Detenido', 'sub2 warning');
+  $('state-sub').textContent = 'sesión en pausa';
+  persistNow();
 }
 
-function onOrientation(event) {
-  let heading = null;
-  if (typeof event.webkitCompassHeading === 'number') {
-    heading = event.webkitCompassHeading;
-  } else if (typeof event.alpha === 'number') {
-    heading = (360 - event.alpha) % 360;
-  }
-
-  if (heading !== null) {
-    const declination = parseFloat($('declination').value || 0);
-    currentHeading = (heading + declination + 360) % 360;
-    $('heading-val').textContent = currentHeading.toFixed(1);
-  }
-}
-
-function onMotion(event) {
-  if (!running) return;
-
-  const a = event.accelerationIncludingGravity || {};
-  const g = event.rotationRate || {};
-
-  currentAcc.x = a.x ?? 0.000;
-  currentAcc.y = a.y ?? 0.000;
-  currentAcc.z = a.z ?? 0.000;
-
-  currentGyro.x = g.alpha ?? 0.000;
-  currentGyro.y = g.beta ?? 0.000;
-  currentGyro.z = g.gamma ?? 0.000;
-
-  $('acc-val').textContent = `${currentAcc.x.toFixed(1)}, ${currentAcc.y.toFixed(1)}, ${currentAcc.z.toFixed(1)}`;
-  $('gyro-val').textContent = `${currentGyro.x.toFixed(1)}, ${currentGyro.y.toFixed(1)}, ${currentGyro.z.toFixed(1)}`;
-
-  const magnitude = Math.sqrt(currentAcc.x ** 2 + currentAcc.y ** 2 + currentAcc.z ** 2);
-  const t = performance.now();
-
-  detectStep(t, magnitude);
-}
-
-let stepOccurredInCycle = null;
-
-function detectStep(t, magnitude) {
-  const rising = magnitude > lastMagnitude;
-  const isPeak = peakArmed && rising && magnitude > 11.2;
-  const cooldownPassed = (t - lastPeakTime) > 300;
-
-  if (isPeak && cooldownPassed) {
-    peakArmed = false;
-    lastPeakTime = t;
-    totalSteps++;
-
-    const minS = parseFloat($('minStride').value || 0.679);
-    const maxS = parseFloat($('maxStride').value || 0.981);
-    const factor = Math.min(Math.max((magnitude - 11.2) / (16.0 - 11.2), 0), 1);
-    const stride = minS + factor * (maxS - minS);
-
-    if (currentHeading !== null) {
-      const rad = currentHeading * Math.PI / 180;
-      x += stride * Math.sin(rad);
-      y += stride * Math.cos(rad);
-      
-      minX = Math.min(minX, x);
-      maxX = Math.max(maxX, x);
-      minY = Math.min(minY, y);
-      maxY = Math.max(maxY, y);
-    }
-
-    $('step-count').textContent = totalSteps;
-    $('stride-val').textContent = stride.toFixed(1) + ' m';$('state-val').textContent = 'En movimiento 🚶‍♂️';
-    $('state-val').className = 'value highlight';
-
-    stepOccurredInCycle = totalSteps;
-    drawMap();
-
-    setTimeout(() => peakArmed = true, 120);
-  }
-
-  if (!rising) peakArmed = true;
-  lastMagnitude = magnitude;
-}
-
-function recordSampleData() {
-  const elapsedMs = Math.round(performance.now() - sessionStartMs);
-  
-  const record = {
-    id: records.length + 1,
-    timeMs: elapsedMs,
-    accX: currentAcc.x,
-    accY: currentAcc.y,
-    accZ: currentAcc.z,
-    gyrX: currentGyro.x,
-    gyrY: currentGyro.y,
-    gyrZ: currentGyro.z,
-    heading: currentHeading !== null ? currentHeading.toFixed(1) : '',
-    stepMatch: stepOccurredInCycle !== null ? stepOccurredInCycle : ''
-  };
-
-  records.push(record);
-  addRow(record);
-
-  stepOccurredInCycle = null;
-}
-
-setInterval(() => {
-  if (running && lastPeakTime > 0 && (performance.now() - lastPeakTime) > 1800) {
-    $('state-val').textContent = 'Detenido 🛑';
-    $('state-val').className = 'value warning';
-  }
-}, 500);
-
-function addRow(r) {
-  const tbody = $('log');
-  const tr = document.createElement('tr');
-  tr.innerHTML = `
-    <td>${r.id}</td>
-    <td>${r.timeMs}</td>
-    <td>${r.accX.toFixed(1)}</td>
-    <td>${r.accY.toFixed(1)}</td>
-    <td>${r.accZ.toFixed(1)}</td>
-    <td>${r.gyrX.toFixed(1)}</td>
-    <td>${r.gyrY.toFixed(1)}</td>
-    <td>${r.gyrZ.toFixed(1)}</td>
-    <td>${r.heading}</td>
-    <td style="color: ${r.stepMatch !== '' ? '#4ade80' : '#8b949e'}; font-weight: ${r.stepMatch !== '' ? 'bold' : 'normal'};">${r.stepMatch}</td>
-  `;
-  tbody.prepend(tr);
-
-  if (tbody.children.length > 150) {
-    tbody.lastChild.remove();
-  }
-}
-
-function drawMap() {
-  const width = canvas.width = canvas.clientWidth * devicePixelRatio;
-  const height = canvas.height = 380 * devicePixelRatio;
-  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-
-  const displayWidth = canvas.clientWidth;
-  const displayHeight = 380;
-
-  ctx.clearRect(0, 0, displayWidth, displayHeight);
-
-  const pad = 40;
-  const rangeX = Math.max(maxX - minX, 2); 
-  const rangeY = Math.max(maxY - minY, 2);
-  const scale = Math.min((displayWidth - 2 * pad) / rangeX, (displayHeight - 2 * pad) / rangeY);
-
-  const px = realX => displayWidth / 2 + (realX - (minX + maxX) / 2) * scale;
-  const py = realY => displayHeight / 2 - (realY - (minY + maxY) / 2) * scale;
-
-  ctx.strokeStyle = '#21262d';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(px(0), 0); ctx.lineTo(px(0), displayHeight);
-  ctx.moveTo(0, py(0)); ctx.lineTo(displayWidth, py(0));
-  ctx.stroke();
-
-  ctx.strokeStyle = '#8b949e';
-  ctx.beginPath();
-  ctx.moveTo(displayWidth - 30, 50);
-  ctx.lineTo(displayWidth - 30, 20);
-  ctx.stroke();
-  ctx.fillStyle = '#8b949e';
-  ctx.font = '12px system-ui';
-  ctx.fillText('N', displayWidth - 34, 15);
-
-  const stepRecords = records.filter(r => r.stepMatch !== '');
-  
-  if (stepRecords.length === 0) {
-    ctx.fillStyle = '#4ade80';
-    ctx.beginPath(); ctx.arc(px(0), py(0), 6, 0, Math.PI * 2); ctx.fill();
-    return;
-  }
-
-  let trackX = 0, trackY = 0;
-  ctx.strokeStyle = '#38bdf8';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(px(0), py(0));
-
-  stepRecords.forEach(sr => {
-    trackX += 0.75 * Math.sin(parseFloat(sr.heading || 0) * Math.PI / 180);
-    trackY += 0.75 * Math.cos(parseFloat(sr.heading || 0) * Math.PI / 180);
-    ctx.lineTo(px(trackX), py(trackY));
-  });
-  ctx.stroke();
-
-  ctx.fillStyle = '#238636';
-  ctx.beginPath(); ctx.arc(px(0), py(0), 5, 0, Math.PI * 2); ctx.fill();
-
-  ctx.fillStyle = '#4ade80';
-  ctx.beginPath(); ctx.arc(px(trackX), py(trackY), 6, 0, Math.PI * 2); ctx.fill();
-}
-
-function exportCSV() {
-  if (!records.length) return;
-
-  const header = 'ID,Time,AccX,AccY,AccZ,GyrX,GyrY,GyrZ,Rumbo,Paso\n';
-  const rows = records.map(r => 
-    `${r.id},${r.timeMs},${r.accX.toFixed(1)},${r.accY.toFixed(1)},${r.accZ.toFixed(1)},${r.gyrX.toFixed(1)},${r.gyrY.toFixed(1)},${r.gyrZ.toFixed(1)},${r.heading},${r.stepMatch}`
-  ).join('\n');
-
-  const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `PDR_${sessionStartTimestamp || 'sesion'}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+/** Reinicia por completo el estado de sensado (no el historial). */
+function resetDetector() {
+  S.gravity = { x:0, y:0, z:0 };
+  S.linMag = 0; S.linX = S.linY = S.linZ = 0;
+  S.hist.length = 0;
+  S.stepActive = false; S.stepPeak = 0; S.stepPeakT = 0; S.stepStartT = 0;
+  S.lastStepT = 0; S.thrHigh = 1.2; S.thrLow = 0.6;
+  S.quietSince = null;
+  S.gyroBias = 0; S.gyroInit = false; S.gyroH = null;
+  S.compass = null; S.compassTrue = false; S.compassWeight = 0;
+  S.heading = null; S.headingOffset = 0; S.headingSource = '—';
+  S.haveTilt = false; S.beta = 90; S.gamma = 0;
+  S.lastMotionT = 0; S.lastYawRate = 0;
+  S.strideEMA = 0.75; S.lastStride = 0.75;
+  S.motionCount = 0; S.hz = 0; S.hzMark = performance.now();
+  rawBuf.length = 0;
 }
 
 function resetAll() {
   stopListening();
-  records = [];
-  totalSteps = 0;
-  x = y = 0;
-  minX = -1; maxX = 1; minY = -1; maxY = 1;
-  sessionStartTimestamp = null;
-  sessionStartMs = 0;
-  
-  $('step-count').textContent = '0';$('state-val').textContent = 'Detenido';
-  $('state-val').className = 'value warning';$('stride-val').textContent = '0.750 m';
-  $('table-title').textContent = 'Registro General [--------:------] (Cada 50 ms + Match de Paso)';$('log').innerHTML = '';
+  S.records.length = 0; S.steps.length = 0;
+  S.totalSteps = 0; S.totalDistance = 0; S.stepSeq = 0; S.pendingStep = null;
+  S.x = 0; S.y = 0; S.minX = -1; S.maxX = 1; S.minY = -1; S.maxY = 1;
+  S.view = { zoom: 1, ox: 0, oy: 0, manual: false };
+  S.sessionStart = null; S.sessionStartMs = 0;
+  S.persistedRec = 0; S.persistedStep = 0;
+  resetDetector();
+
+  $('step-count').textContent = '0';
+  $('cadence-sub').textContent = '— ppm';
+  $('dist-val').textContent   = '0.000 m';
+  $('zancada-sub').textContent = 'zancada 0.750 m';
+  $('heading-val').textContent = '--';
+  $('heading-src').textContent = 'sin fuente';
+  $('compass-val').textContent = '--';
+  $('acc-val').textContent = '0.000, 0.000, 0.000';
+  $('gyro-val').textContent = '0.000, 0.000, 0.000';
+  $('yaw-val').textContent  = '0.000 °/s';
+  $('hz-val').textContent   = '0 Hz';
+  $('conf-val').textContent = '--';
+  $('quiet-sub').textContent = '—';
+  $('rec-val').textContent  = '0';
+  $('sess-val').textContent = '--------';
+  $('mode-val').textContent = '—';
+  $('acc-sub').textContent  = 'con gravedad';
+  $('log').innerHTML = '';
+  $('table-title').textContent = 'Registro general [--------] (cada 50 ms · pico preservado)';
+  setState('Detenido', 'sub2 warning');
+  $('state-sub').textContent = 'sin sesión';
   drawMap();
+  clearStore();
 }
 
-$('startBtn').onclick = requestSensors;
-$('stopBtn').onclick = stopListening;
-$('exportBtn').onclick = exportCSV;
-$('resetBtn').onclick = resetAll;
+/* ========================= TICK (50 ms, con corrección de deriva) ========================= */
+function scheduleTick() {
+  if (!S.running) return;
+  const drift = performance.now() - S.lastTick;
+  S.timer = setTimeout(() => { S.lastTick = performance.now(); recordSample(); scheduleTick(); },
+                       Math.max(0, SAMPLE_MS - drift));
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { if (S.timer) { clearTimeout(S.timer); S.timer = null; } }
+  else if (S.running && !S.timer) { S.lastTick = performance.now(); scheduleTick(); }
+});
 
+/* ========================= SENSORES ========================= */
+function onMotion(e) {
+  const t = performance.now();
+  const dt = clamp((t - S.lastMotionT) / 1000, 0, 0.2);
+  S.lastMotionT = t;
+
+  /* --- acelerómetro --- */
+  let ax, ay, az, lin, mode;
+  const gA = e.accelerationIncludingGravity;
+  if (gA && (typeof gA.x === 'number' || typeof gA.y === 'number' || typeof gA.z === 'number')) {
+    ax = num(gA.x); ay = num(gA.y); az = num(gA.z);
+    const g = S.gravity;
+    g.x += GRAV_ALPHA * (ax - g.x);
+    g.y += GRAV_ALPHA * (ay - g.y);
+    g.z += GRAV_ALPHA * (az - g.z);
+    lin = { x: ax - g.x, y: ay - g.y, z: az - g.z };
+    mode = 'grav';
+  } else {
+    const lA = e.acceleration || {};
+    ax = num(lA.x); ay = num(lA.y); az = num(lA.z);
+    lin = { x: ax, y: ay, z: az };
+    mode = 'lin';
+  }
+  if (mode !== S.accMode) { S.accMode = mode; $('mode-val').textContent = mode === 'grav' ? 'con gravedad' : 'solo lineal'; }
+  S.linX = lin.x; S.linY = lin.y; S.linZ = lin.z;
+  const linMag = Math.hypot(lin.x, lin.y, lin.z);
+  S.linMag = linMag;
+
+  /* --- giroscopio: ejes del dispositivo + yaw sobre la vertical del mundo --- */
+  const rr = e.rotationRate || {};
+  const wx = num(rr.beta);    // rotación sobre el eje X del dispositivo
+  const wy = num(rr.gamma);   // rotación sobre el eje Y del dispositivo
+  const wz = num(rr.alpha);   // rotación sobre el eje Z del dispositivo
+  const yawRate = computeYawRate(wx, wy, wz);
+
+  /* --- integración del rumbo + fusión con el magnetómetro --- */
+  updateHeading(t, dt, yawRate);
+
+  /* --- ZUPT: quieto -> congelar la deriva del giroscopio --- */
+  if (linMag < 0.35 && Math.abs(yawRate) < 0.08) { if (S.quietSince === null) S.quietSince = t; }
+  else S.quietSince = null;
+  if (S.quietSince !== null && t - S.quietSince > 1200) {
+    S.gyroBias = S.gyroBias * 0.98 + (yawRate - S.gyroBias) * 0.02;
+  }
+
+  /* --- detección de pasos (a frecuencia nativa) --- */
+  detectStep(t, linMag);
+
+  /* --- buffer de muestras para el registro de 50 ms --- */
+  rawBuf.push({ t, ax, ay, az, wx, wy, wz, lin: linMag, yaw: yawRate });
+  if (rawBuf.length > 800) rawBuf.shift();
+
+  lastSample = rawBuf[rawBuf.length - 1];
+  S.motionCount++;
+  const now2 = performance.now();
+  if (now2 - S.hzMark >= 500) {
+    S.hz = Math.round(S.motionCount * 1000 / (now2 - S.hzMark));
+    S.motionCount = 0; S.hzMark = now2;
+    $('hz-val').textContent = S.hz + ' Hz';
+    $('sig-sub').textContent = S.hz > 0 ? 'sensor activo' : 'sin señal';
+  }
+}
+
+/**
+ * Componente de la velocidad angular sobre la vertical del mundo (yaw).
+ * ω_world.z = -cosβ·sinγ·ωx + sinβ·ωy + cosβ·cosγ·ωz
+ * (β,γ: inclinación del dispositivo; ωx,ωy,ωz: velocidades en ejes del dispositivo)
+ */
+function computeYawRate(wx, wy, wz) {
+  const posture = $('posture').value;
+  let b, g;
+  if (posture === 'vertical') { b = 90; g = 0; }
+  else if (posture === 'plano') { b = 0; g = 0; }
+  else { b = S.haveTilt ? S.beta : 90; g = S.haveTilt ? S.gamma : 0; }
+  const cb = Math.cos(toRad(b)), sb = Math.sin(toRad(b));
+  const cg = Math.cos(toRad(g)), sg = Math.sin(toRad(g));
+  let yaw = -cb * sg * wx + sb * wy + cb * cg * wz;
+  if ($('invertYaw').checked) yaw = -yaw;
+  S.lastYawRate = yaw;
+  return yaw;
+}
+
+function updateHeading(t, dt, yawRate) {
+  if (S.gyroH === null) S.gyroH = 0;
+
+  // 1) integrar giroscopio (yaw positivo antihorario => el rumbouhrzeiger decreases)
+  if (dt > 0) S.gyroH = (S.gyroH - (yawRate - S.gyroBias) * dt + 360) % 360;
+
+  // 2) fusionar con el magnetómetro (corrección lenta)
+  let abs;
+  if (S.compass !== null) {
+    abs = circLerp(S.gyroH, S.compass, S.compassWeight);
+    S.headingSource = S.compassTrue ? 'giroscopio + magnetómetro (norte verdadero)'
+                                     : 'giroscopio + magnetómetro (norte magnético)';
+  } else {
+    abs = S.gyroH;
+    S.headingSource = 'solo giroscopio (relativo)';
+  }
+  S.heading = (abs - S.headingOffset + 360) % 360;
+}
+
+/* --- magnetómetro / orientación --- */
+function onOrientation(e) { handleOrientation(e, false); }
+function onOrientationAbsolute(e) { handleOrientation(e, true); }
+
+function handleOrientation(e, absolute) {
+  S.orientationCount++;
+  if (typeof e.beta === 'number') { S.beta = e.beta; S.haveTilt = true; }
+  if (typeof e.gamma === 'number') { S.gamma = e.gamma; S.haveTilt = true; }
+
+  const decl = parseFloat($('declination').value) || 0;
+  let heading = null, isTrue = false, weight = 0;
+
+  if (typeof e.webkitCompassHeading === 'number' && !Number.isNaN(e.webkitCompassHeading)) {
+    heading = e.webkitCompassHeading;    // iOS: ya viene en norte verdadero -> NO sumar declinación
+    isTrue = true;  weight = 0.06;
+  } else if (absolute && typeof e.alpha === 'number') {
+    heading = (360 - e.alpha) % 360;      // Android absoluto: norte magnético -> sumar declinación
+    isTrue = false; weight = 0.05;
+  } else if (typeof e.alpha === 'number') {
+    heading = (360 - e.alpha) % 360;      // relativo al arranque del sensor: solo corrige deriva
+    isTrue = false; weight = 0.012;
+  }
+
+  if (heading !== null) {
+    if (!isTrue) heading = (heading + decl + 360) % 360;
+    S.compass = heading; S.compassTrue = isTrue; S.compassWeight = weight;
+    if (!S.gyroInit) { S.gyroH = heading; S.gyroInit = true; }
+  }
+}
+
+/* ========================= DETECCIÓN DE PASOS ========================= */
+function detectStep(t, linMag) {
+  // umbral adaptativo sobre los últimos ~1.5 s
+  const hist = S.hist;
+  const thr = Math.max(1.2, avg(hist) + 1.4 * std(hist));
+  S.thrHigh = thr;
+  S.thrLow  = thr * 0.55;
+  hist.push(linMag);
+  if (hist.length > 90) hist.shift();
+
+  if (!S.stepActive) {
+    if (linMag > S.thrHigh && (t - S.lastStepT) > 260) {
+      S.stepActive = true; S.stepPeak = linMag; S.stepPeakT = t; S.stepStartT = t;
+    }
+  } else {
+    if (linMag > S.stepPeak) { S.stepPeak = linMag; S.stepPeakT = t; }
+    // el paso se confirma cuando la señal vuelve a bajar (histéresis real)
+    if (linMag < S.thrLow || (t - S.stepStartT) > 1500) finalizeStep(t);
+  }
+}
+
+function finalizeStep(t) {
+  const peak = S.stepPeak;
+  S.stepActive = false;
+  S.lastStepT = t;
+
+  const minS = clamp(parseFloat($('minStride').value) || 0.679, 0.2, 2.5);
+  const maxS = clamp(parseFloat($('maxStride').value) || 0.981, 0.2, 2.5);
+  const lo = Math.min(minS, maxS), hi = Math.max(minS, maxS);
+
+  const f = clamp((peak - 1.6) / (4.5 - 1.6), 0, 1);
+  const raw = lo + f * (hi - lo);
+  const a = clamp(parseFloat($('emaAlpha').value) || 0.3, 0.05, 1);
+  S.strideEMA = S.strideEMA * (1 - a) + raw * a;
+  S.lastStride = S.strideEMA;
+
+  // avance según el rumbo fusionado
+  const hdg = S.heading === null ? 0 : S.heading;
+  const rad = toRad(hdg);
+  S.x += S.strideEMA * Math.sin(rad);
+  S.y += S.strideEMA * Math.cos(rad);
+  S.minX = Math.min(S.minX, S.x); S.maxX = Math.max(S.maxX, S.x);
+  S.minY = Math.min(S.minY, S.y); S.maxY = Math.max(S.maxY, S.y);
+
+  S.totalSteps++;
+  S.totalDistance += S.strideEMA;
+  S.stepSeq++;
+
+  const step = {
+    n: S.stepSeq, t: Math.round(t - S.sessionStartMs),
+    x: S.x, y: S.y, stride: S.strideEMA, heading: hdg, peak
+  };
+  S.steps.push(step);
+  S.pendingStep = step;
+
+  $('step-count').textContent = S.totalSteps;
+  $('zancada-sub').textContent = 'zancada ' + fmt(S.strideEMA) + ' m';
+  setState('En movimiento', 'sub2 highlight');
+  $('state-sub').textContent = 'último pico ' + fmt(peak) + ' m/s²';
+  drawMap();
+  updateCadence(t);
+}
+
+let lastStepTimes = [];
+function updateCadence(t) {
+  lastStepTimes.push(t);
+  if (lastStepTimes.length > 6) lastStepTimes.shift();
+  if (lastStepTimes.length < 3) { $('cadence-sub').textContent = '— ppm'; return; }
+  const span = lastStepTimes[lastStepTimes.length-1] - lastStepTimes[0];
+  const ppm = span > 0 ? Math.round((lastStepTimes.length - 1) * 60000 / span) : 0;
+  $('cadence-sub').textContent = ppm + ' ppm';
+}
+
+/* ========================= REGISTRO DE 50 ms ========================= */
+function recordSample() {
+  const t = performance.now();
+  const winStart = t - SAMPLE_MS;
+
+  let win = rawBuf.filter(s => s.t > winStart);
+  if (!win.length) win = lastSample.t > winStart ? [lastSample] : [];
+  if (!win.length) return;
+
+  // muestra con mayor magnitud lineal (preserva el pico de impacto)
+  let peak = win[0];
+  for (const s of win) if (s.lin > peak.lin) peak = s;
+
+  const rec = {
+    id: S.records.length + 1,
+    timeMs: Math.round(t - S.sessionStartMs),
+    accX: peak.ax, accY: peak.ay, accZ: peak.az,
+    lin: peak.lin,
+    gyrX: peak.wx, gyrY: peak.wy, gyrZ: peak.wz,
+    yaw: peak.yaw,
+    heading: S.heading,
+    stepMatch: '',
+    x: S.x, y: S.y
+  };
+  // asociar el paso al ciclo en el que ha ocurrido
+  if (S.pendingStep && S.pendingStep.t >= winStart - 200 && S.pendingStep.t <= t + 50) {
+    rec.stepMatch = S.pendingStep.n;
+    S.pendingStep = null;
+  }
+
+  S.records.push(rec);
+  queueRow(rec);
+  $('rec-val').textContent = S.records.length;
+
+  // purgar lo ya registrado
+  for (let i = 0; i < rawBuf.length; i++) {
+    if (rawBuf[i].t > winStart) { rawBuf.splice(0, i); break; }
+  }
+  schedulePersist();
+}
+
+/* ========================= TABLA (escritura por lotes) ========================= */
+const pendingRows = [];
+function queueRow(r) { pendingRows.push(r); if (pendingRows.length > 600) pendingRows.shift(); }
+
+setInterval(() => {
+  if (!pendingRows.length) return;
+  const frag = document.createDocumentFragment();
+  for (const r of pendingRows.splice(0)) {
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td class="id">' + r.id + '</td>' +
+      '<td>' + r.timeMs + '</td>' +
+      '<td>' + fmt(r.accX) + '</td>' +
+      '<td>' + fmt(r.accY) + '</td>' +
+      '<td>' + fmt(r.accZ) + '</td>' +
+      '<td>' + fmt(r.lin) + '</td>' +
+      '<td>' + fmt(r.gyrX) + '</td>' +
+      '<td>' + fmt(r.gyrY) + '</td>' +
+      '<td>' + fmt(r.gyrZ) + '</td>' +
+      '<td>' + fmt(r.yaw) + '</td>' +
+      '<td>' + (r.heading === null ? '' : fmt(r.heading)) + '</td>' +
+      '<td class="step" style="color:' + (r.stepMatch !== '' ? '#4ade80' : '#6e7681') + ';font-weight:' +
+        (r.stepMatch !== '' ? 'bold' : 'normal') + '">' + r.stepMatch + '</td>' +
+      '<td>' + fmt(r.x) + '</td>' +
+      '<td>' + fmt(r.y) + '</td>';
+    frag.prepend(tr);
+  }
+  $('log').prepend(frag);
+  while ($('log').children.length > 300) $('log').lastChild.remove();
+}, 500);
+
+/* ========================= MAPA ========================= */
+function drawMap() {
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (!w || !h) return;
+  if (canvas.width !== Math.round(w*dpr) || canvas.height !== Math.round(h*dpr)) {
+    canvas.width = Math.round(w*dpr); canvas.height = Math.round(h*dpr);
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#010409'; ctx.fillRect(0, 0, w, h);
+
+  const rangeX = Math.max(S.maxX - S.minX, 1);
+  const rangeY = Math.max(S.maxY - S.minY, 1);
+  const pad = 46;
+  const fit = Math.min((w - 2*pad) / rangeX, (h - 2*pad) / rangeY);
+  const scale = fit * S.view.zoom;
+  const cx = (S.minX + S.maxX) / 2, cy = (S.minY + S.maxY) / 2;
+  const px = rx => w/2 + (rx - cx) * scale + S.view.ox;
+  const py = ry => h/2 - (ry - cy) * scale + S.view.oy;
+
+  // rejilla
+  const gridStep = niceStep(rangeX / 6);
+  ctx.strokeStyle = '#161b22'; ctx.lineWidth = 1;
+  ctx.fillStyle = '#30363d'; ctx.font = '10px ui-monospace, monospace';
+  const x0 = Math.floor((S.minX - cx) / gridStep) * gridStep + cx;
+  for (let gx = x0; gx <= S.maxX + gridStep; gx += gridStep) {
+    const X = px(gx); ctx.beginPath(); ctx.moveTo(X, 0); ctx.lineTo(X, h); ctx.stroke();
+    ctx.fillText(gx.toFixed(1) + ' m', X + 3, h - 6);
+  }
+  const y0 = Math.floor((S.minY - cy) / gridStep) * gridStep + cy;
+  for (let gy = y0; gy <= S.maxY + gridStep; gy += gridStep) {
+    const Y = py(gy); ctx.beginPath(); ctx.moveTo(0, Y); ctx.lineTo(w, Y); ctx.stroke();
+    ctx.fillText(gy.toFixed(1) + ' m', 4, Y - 4);
+  }
+
+  // trayectoria
+  if (S.steps.length > 1) {
+    ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(px(0), py(0));
+    for (const s of S.steps) ctx.lineTo(px(s.x), py(s.y));
+    ctx.stroke();
+  }
+  // puntos de paso
+  ctx.fillStyle = '#1f6feb';
+  for (const s of S.steps) { ctx.beginPath(); ctx.arc(px(s.x), py(s.y), 2.6, 0, Math.PI*2); ctx.fill(); }
+
+  // inicio
+  ctx.fillStyle = '#238636'; ctx.beginPath(); ctx.arc(px(0), py(0), 5.5, 0, Math.PI*2); ctx.fill();
+  // posición actual
+  if (S.steps.length) {
+    ctx.fillStyle = '#4ade80'; ctx.beginPath(); ctx.arc(px(S.x), py(S.y), 6, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#0d1117'; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+
+  // flecha de rumbo
+  if (S.heading !== null && S.steps.length) {
+    const X = px(S.x), Y = py(S.y), rad = toRad(S.heading), L = 26;
+    const dirX = Math.sin(rad), dirY = -Math.cos(rad);
+    ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(X, Y); ctx.lineTo(X + dirX*L, Y + dirY*L); ctx.stroke();
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath();
+    ctx.arc(X + dirX*L, Y + dirY*L, 3.4, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // leyenda
+  ctx.fillStyle = '#8b949e'; ctx.font = '11px system-ui';
+  ctx.fillText('▲ inicio   ● actual   — recorrido   — rumbo', 8, 16);
+  ctx.fillText('escala ≈ ' + (scale ? (1/scale).toFixed(2) : '—') + ' m/px', w - 108, 16);
+}
+function niceStep(v) {
+  if (!v || !isFinite(v)) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  const n = v / p;
+  return (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * p;
+}
+
+/* pan / zoom del mapa */
+let drag = null;
+canvas.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, ox: S.view.ox, oy: S.view.oy }; canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener('pointermove', e => {
+  if (!drag) return;
+  S.view.ox = drag.ox + (e.clientX - drag.x);
+  S.view.oy = drag.oy + (e.clientY - drag.y);
+  S.view.manual = true; $('autoFit').checked = false;
+  drawMap();
+});
+canvas.addEventListener('pointerup', e => { drag = null; });
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const k = e.deltaY < 0 ? 1.15 : 1/1.15;
+  S.view.zoom = clamp(S.view.zoom * k, 0.25, 40);
+  S.view.manual = true; $('autoFit').checked = false;
+  drawMap();
+}, { passive: false });
+
+function centerMap() { S.view.zoom = 1; S.view.ox = 0; S.view.oy = 0; S.view.manual = false; drawMap(); }
+
+/* ========================= ESTADO / HUD ========================= */
+function setState(text, cls) {
+  const el = $('state-val');
+  el.textContent = text;
+  el.className = 'value ' + (cls === 'sub2 highlight' ? 'highlight' : cls === 'sub2 warning' ? 'warning' : '');
+}
+
+setInterval(() => {
+  $('acc-val').textContent  = fmt(lastSample.ax) + ', ' + fmt(lastSample.ay) + ', ' + fmt(lastSample.az);
+  $('gyro-val').textContent = fmt(lastSample.wx) + ', ' + fmt(lastSample.wy) + ', ' + fmt(lastSample.wz);
+  $('yaw-val').textContent  = fmt(S.lastYawRate) + ' °/s';
+  $('dist-val').textContent = fmt(S.totalDistance) + ' m';
+  if (S.heading !== null) {
+    $('heading-val').textContent = fmt(S.heading) + '°';
+    $('heading-src').textContent = S.headingSource;
+  }
+  if (S.compass !== null) {
+    $('compass-val').textContent = fmt(S.compass) + '°';
+    $('compass-sub').textContent = S.compassTrue ? 'norte verdadero' : 'norte magnético (+' + fmt(parseFloat($('declination').value) || 0, 1) + '°)';
+  }
+  $('quiet-sub').textContent = S.quietSince !== null ? 'quieto (ZUPT)' : 'en movimiento';
+  // watchdog de inmovilidad
+  if (S.running && S.lastStepT > 0 && (performance.now() - S.lastStepT) > 2500) {
+    setState('Quieto', 'sub2 warning');
+    $('state-sub').textContent = 'sin pasos detectados';
+  }
+  if ($('autoFit').checked && S.steps.length) drawMap();
+}, 200);
+
+/* ========================= CALIBRACIÓN ========================= */
+$('calibBtn').onclick = () => {
+  if (!S.running) { toast('Inicia los sensores primero'); return; }
+  const abs = S.compass !== null
+    ? circLerp(S.gyroH === null ? S.compass : S.gyroH, S.compass, S.compassWeight)
+    : (S.gyroH === null ? 0 : S.gyroH);
+  S.headingOffset = abs;
+  S.gyroBias = 0;
+  if (S.gyroH === null) S.gyroH = abs;
+  toast(S.compass !== null
+    ? 'Rumbo calibrado: 0° = dirección actual'
+    : 'Calibrado sin magnetómetro: 0° = dirección actual');
+};
+
+/* ========================= EXPORTAR CSV ========================= */
+function exportCSV() {
+  if (!S.records.length) { toast('No hay datos que exportar'); return; }
+  const head = [
+    '# Registro PDR v2',
+    '# Inicio,' + (S.sessionStart || 'sesion'),
+    '# Muestreo_ms,' + SAMPLE_MS,
+    '# Decimales,' + DEC,
+    '# Zancada_min_m,' + ($('minStride').value),
+    '# Zancada_max_m,' + ($('maxStride').value),
+    '# Pasos,' + S.totalSteps,
+    '# Distancia_m,' + fmt(S.totalDistance),
+    'ID,Time_ms,AccX,AccY,AccZ,LinMag,GirX_dev,GirY_dev,GirZ_dev,YawRate_dps,Rumbo_deg,Paso,X_m,Y_m'
+  ].join('\n');
+
+  const rows = S.records.map(r =>
+    [r.id, r.timeMs,
+     fmt(r.accX), fmt(r.accY), fmt(r.accZ), fmt(r.lin),
+     fmt(r.gyrX), fmt(r.gyrY), fmt(r.gyrZ), fmt(r.yaw),
+     (r.heading === null ? '' : fmt(r.heading)), r.stepMatch,
+     fmt(r.x), fmt(r.y)].join(',')
+  ).join('\n');
+
+  const blob = new Blob([head + '\n' + rows], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'PDR_' + (S.sessionStart || 'sesion') + '.csv';   // sin ':' -> válido en Windows
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+  toast('CSV exportado (' + S.records.length + ' muestras)');
+}
+
+/* ========================= PERSISTENCIA (IndexedDB) ========================= */
+function openDB() {
+  return new Promise((res, rej) => {
+    if (!('indexedDB' in window)) return rej(new Error('IndexedDB no disponible'));
+    const rq = indexedDB.open(DB_NAME, 1);
+    rq.onupgradeneeded = () => {
+      const db = rq.result;
+      if (!db.objectStoreNames.contains(ST_RECORDS)) db.createObjectStore(ST_RECORDS, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(ST_STEPS))   db.createObjectStore(ST_STEPS,   { keyPath: 'n' });
+    };
+    rq.onsuccess = () => res(rq.result);
+    rq.onerror   = () => rej(rq.error);
+  });
+}
+function tx(store, mode) { return S.db.transaction(store, mode).objectStore(store); }
+
+async function initDB() {
+  try {
+    S.db = await openDB();
+    $('db-val').textContent = 'persistencia: IndexedDB';
+  } catch (e) {
+    $('db-val').textContent = 'persistencia: no disponible';
+  }
+}
+let persistTimer = null;
+function schedulePersist() {
+  if (persistTimer) return;
+  persistTimer = setTimeout(() => { persistTimer = null; persistNow(); }, 2000);
+}
+async function persistNow() {
+  if (!S.db) return;
+  try {
+    const recs = S.records.slice(S.persistedRec);
+    const stps = S.steps.slice(S.persistedStep);
+    if (recs.length) {
+      await new Promise((res, rej) => {
+        const t = S.db.transaction(ST_RECORDS, 'readwrite');
+        const os = t.objectStore(ST_RECORDS);
+        recs.forEach(r => os.put(r));
+        t.oncomplete = res; t.onerror = () => rej(t.error);
+      });
+      S.persistedRec = S.records.length;
+    }
+    if (stps.length) {
+      await new Promise((res, rej) => {
+        const t = S.db.transaction(ST_STEPS, 'readwrite');
+        const os = t.objectStore(ST_STEPS);
+        stps.forEach(s => os.put(s));
+        t.oncomplete = res; t.onerror = () => rej(t.error);
+      });
+      S.persistedStep = S.steps.length;
+    }
+  } catch (e) { /* silencioso: la persistencia no debe romper la captura */ }
+}
+async function clearStore() {
+  if (!S.db) return;
+  try {
+    await new Promise(res => {
+      const t = S.db.transaction([ST_RECORDS, ST_STEPS], 'readwrite');
+      t.objectStore(ST_RECORDS).clear(); t.objectStore(ST_STEPS).clear();
+      t.oncomplete = res;
+    });
+  } catch (e) {}
+}
+function readAll(store) {
+  return new Promise((res, rej) => {
+    const rq = tx(store, 'readonly').getAll();
+    rq.onsuccess = () => res(rq.result || []);
+    rq.onerror   = () => rej(rq.error);
+  });
+}
+
+async function checkStored() {
+  if (!S.db) return;
+  try {
+    const recs = await readAll(ST_RECORDS);
+    if (!recs.length) return;
+    const stps = await readAll(ST_STEPS);
+    $('restoreInfo').textContent = 'Sesión anterior guardada: ' + recs.length + ' muestras y ' + stps.length + ' pasos.';
+    $('restoreBanner').style.display = 'block';
+    $('restoreBtn').onclick = async () => {
+      const r = await readAll(ST_RECORDS), s = await readAll(ST_STEPS);
+      S.records = r.sort((a,b) => a.id - b.id);
+      S.steps   = s.sort((a,b) => a.n - b.n);
+      S.totalSteps = S.steps.length;
+      S.totalDistance = S.steps.reduce((a,b) => a + b.stride, 0);
+      S.stepSeq = S.totalSteps;
+      S.persistedRec = S.records.length; S.persistedStep = S.steps.length;
+      if (S.steps.length) {
+        const last = S.steps[S.steps.length - 1];
+        S.x = last.x; S.y = last.y; S.minX = S.maxX = S.x; S.minY = S.maxY = S.y;
+        for (const st of S.steps) {
+          S.minX = Math.min(S.minX, st.x); S.maxX = Math.max(S.maxX, st.x);
+          S.minY = Math.min(S.minY, st.y); S.maxY = Math.max(S.maxY, st.y);
+        }
+      }
+      $('step-count').textContent = S.totalSteps;
+      $('dist-val').textContent = fmt(S.totalDistance) + ' m';
+      $('rec-val').textContent = S.records.length;
+      $('log').innerHTML = '';
+      for (const r of S.records.slice(-300).reverse()) queueRow(r);
+      $('restoreBanner').style.display = 'none';
+      drawMap();
+      toast('Sesión restaurada');
+    };
+    $('discardBtn').onclick = async () => { await clearStore(); $('restoreBanner').style.display = 'none'; };
+  } catch (e) {}
+}
+
+/* ========================= BOTONES ========================= */
+$('startBtn').onclick = requestSensors;
+$('stopBtn').onclick  = stopListening;
+$('exportBtn').onclick = exportCSV;
+$('resetBtn').onclick  = resetAll;
+$('zoomIn').onclick   = () => { S.view.zoom = clamp(S.view.zoom * 1.25, .25, 40); S.view.manual = true; $('autoFit').checked = false; drawMap(); };
+$('zoomOut').onclick  = () => { S.view.zoom = clamp(S.view.zoom / 1.25, .25, 40); S.view.manual = true; $('autoFit').checked = false; drawMap(); };
+$('centerBtn').onclick = centerMap;
+$('autoFit').onchange = () => { if ($('autoFit').checked) { S.view.manual = false; S.view.zoom = 1; S.view.ox = 0; S.view.oy = 0; } drawMap(); };
 window.addEventListener('resize', drawMap);
+window.addEventListener('beforeunload', () => { persistNow(); });
+
+/* ========================= ARRANQUE ========================= */
 drawMap();
+initDB().then(checkStored);
 </script>
 </body>
 </html>
