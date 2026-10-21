@@ -246,6 +246,7 @@ const S = {
   // brújula / giroscopio
   beta: 90, gamma: 0,                 // postura (Auto los actualiza desde el sensor)
   haveTilt: false,
+  posture: 'auto', invertYaw: false,  // ajustes cacheados (no leer el DOM a 60 Hz)
   compass: null,                      // rumbo del magnetómetro (grados)
   compassTrue: false,                 // ¿ya viene en norte verdadero? (iOS)
   compassWeight: 0,                   // peso de la corrección complementaria
@@ -256,6 +257,7 @@ const S = {
   heading: null,                      // heading fusionado ya compensado
   headingSource: '—',
   lastYawRate: 0,
+  conf: 0,                            // confianza en el rumbo (0-100 %)
 
   // detector
   gravity: { x:0, y:0, z:0 },
@@ -368,7 +370,7 @@ function resetDetector() {
   S.quietSince = null;
   S.gyroBias = 0; S.gyroInit = false; S.gyroH = null;
   S.compass = null; S.compassTrue = false; S.compassWeight = 0;
-  S.heading = null; S.headingOffset = 0; S.headingSource = '—';
+  S.heading = null; S.headingOffset = 0; S.headingSource = '—'; S.conf = 0;
   S.haveTilt = false; S.beta = 90; S.gamma = 0;
   S.lastMotionT = 0; S.lastYawRate = 0;
   S.strideEMA = 0.75; S.lastStride = 0.75;
@@ -426,7 +428,7 @@ document.addEventListener('visibilitychange', () => {
 /* ========================= SENSORES ========================= */
 function onMotion(e) {
   const t = performance.now();
-  const dt = clamp((t - S.lastMotionT) / 1000, 0, 0.2);
+  const dt = S.lastMotionT === 0 ? 0 : clamp((t - S.lastMotionT) / 1000, 0, 0.2);
   S.lastMotionT = t;
 
   /* --- acelerómetro --- */
@@ -492,15 +494,14 @@ function onMotion(e) {
  * (β,γ: inclinación del dispositivo; ωx,ωy,ωz: velocidades en ejes del dispositivo)
  */
 function computeYawRate(wx, wy, wz) {
-  const posture = $('posture').value;
   let b, g;
-  if (posture === 'vertical') { b = 90; g = 0; }
-  else if (posture === 'plano') { b = 0; g = 0; }
+  if (S.posture === 'vertical') { b = 90; g = 0; }
+  else if (S.posture === 'plano') { b = 0; g = 0; }
   else { b = S.haveTilt ? S.beta : 90; g = S.haveTilt ? S.gamma : 0; }
   const cb = Math.cos(toRad(b)), sb = Math.sin(toRad(b));
   const cg = Math.cos(toRad(g)), sg = Math.sin(toRad(g));
   let yaw = -cb * sg * wx + sb * wy + cb * cg * wz;
-  if ($('invertYaw').checked) yaw = -yaw;
+  if (S.invertYaw) yaw = -yaw;
   S.lastYawRate = yaw;
   return yaw;
 }
@@ -522,6 +523,23 @@ function updateHeading(t, dt, yawRate) {
     S.headingSource = 'solo giroscopio (relativo)';
   }
   S.heading = (abs - S.headingOffset + 360) % 360;
+  updateConfidence();
+}
+
+/**
+ * Confianza del rumbo: base según la fuente disponible y penalización por
+ * discrepancia entre giroscopio y magnetómetro (y por giros muy rápidos).
+ */
+function updateConfidence() {
+  let c;
+  if (S.compass === null) {
+    c = 35;                                     // solo giroscopio: deriva garantizada
+  } else {
+    const diff = Math.abs(circDiff(S.gyroH === null ? S.compass : S.gyroH, S.compass));
+    c = 95 - Math.min(55, diff * 1.2);
+    if (Math.abs(S.lastYawRate) > 60) c -= 15;   // giro rápido: brújula menos fiable
+  }
+  S.conf = clamp(c, 0, 100);
 }
 
 /* --- magnetómetro / orientación --- */
@@ -538,13 +556,13 @@ function handleOrientation(e, absolute) {
 
   if (typeof e.webkitCompassHeading === 'number' && !Number.isNaN(e.webkitCompassHeading)) {
     heading = e.webkitCompassHeading;    // iOS: ya viene en norte verdadero -> NO sumar declinación
-    isTrue = true;  weight = 0.06;
+    isTrue = true;  weight = 0.03;
   } else if (absolute && typeof e.alpha === 'number') {
     heading = (360 - e.alpha) % 360;      // Android absoluto: norte magnético -> sumar declinación
-    isTrue = false; weight = 0.05;
+    isTrue = false; weight = 0.03;
   } else if (typeof e.alpha === 'number') {
     heading = (360 - e.alpha) % 360;      // relativo al arranque del sensor: solo corrige deriva
-    isTrue = false; weight = 0.012;
+    isTrue = false; weight = 0.008;
   }
 
   if (heading !== null) {
@@ -603,7 +621,7 @@ function finalizeStep(t) {
   S.stepSeq++;
 
   const step = {
-    n: S.stepSeq, t: Math.round(t - S.sessionStartMs),
+    n: S.stepSeq, t: Math.round(t - S.sessionStartMs), at: t,   // t = relativo, at = absoluto
     x: S.x, y: S.y, stride: S.strideEMA, heading: hdg, peak
   };
   S.steps.push(step);
@@ -651,8 +669,9 @@ function recordSample() {
     stepMatch: '',
     x: S.x, y: S.y
   };
-  // asociar el paso al ciclo en el que ha ocurrido
-  if (S.pendingStep && S.pendingStep.t >= winStart - 200 && S.pendingStep.t <= t + 50) {
+  // asociar el paso al ciclo en el que ha ocurrido (el paso se confirma al bajar el pico,
+  // por eso puede caer en la ventana siguiente a la del pico)
+  if (S.pendingStep && S.pendingStep.at > winStart && S.pendingStep.at <= t + 50) {
     rec.stepMatch = S.pendingStep.n;
     S.pendingStep = null;
   }
@@ -662,9 +681,9 @@ function recordSample() {
   $('rec-val').textContent = S.records.length;
 
   // purgar lo ya registrado
-  for (let i = 0; i < rawBuf.length; i++) {
-    if (rawBuf[i].t > winStart) { rawBuf.splice(0, i); break; }
-  }
+  let cut = 0;
+  while (cut < rawBuf.length && rawBuf[cut].t <= winStart) cut++;
+  if (cut > 0) rawBuf.splice(0, cut);
   schedulePersist();
 }
 
@@ -820,6 +839,8 @@ setInterval(() => {
     $('compass-sub').textContent = S.compassTrue ? 'norte verdadero' : 'norte magnético (+' + fmt(parseFloat($('declination').value) || 0, 1) + '°)';
   }
   $('quiet-sub').textContent = S.quietSince !== null ? 'quieto (ZUPT)' : 'en movimiento';
+  $('conf-val').textContent = S.running ? Math.round(S.conf) + ' %' : '--';
+  $('conf-sub').textContent = S.compass !== null ? 'giroscopio + magnetómetro' : 'solo giroscopio';
   // watchdog de inmovilidad
   if (S.running && S.lastStepT > 0 && (performance.now() - S.lastStepT) > 2500) {
     setState('Quieto', 'sub2 warning');
@@ -993,6 +1014,8 @@ $('zoomIn').onclick   = () => { S.view.zoom = clamp(S.view.zoom * 1.25, .25, 40)
 $('zoomOut').onclick  = () => { S.view.zoom = clamp(S.view.zoom / 1.25, .25, 40); S.view.manual = true; $('autoFit').checked = false; drawMap(); };
 $('centerBtn').onclick = centerMap;
 $('autoFit').onchange = () => { if ($('autoFit').checked) { S.view.manual = false; S.view.zoom = 1; S.view.ox = 0; S.view.oy = 0; } drawMap(); };
+$('posture').onchange  = () => { S.posture = $('posture').value; toast('Postura: ' + $('posture').selectedOptions[0].text); };
+$('invertYaw').onchange = () => { S.invertYaw = $('invertYaw').checked; };
 window.addEventListener('resize', drawMap);
 window.addEventListener('beforeunload', () => { persistNow(); });
 
