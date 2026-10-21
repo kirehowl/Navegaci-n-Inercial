@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Registro Unificado v3.1 (50 ms · 3 decimales · PDR)</title>
+<title>Registro Unificado v3.2 (50 ms · 3 decimales · PDR)</title>
 <style>
   :root { color-scheme: dark; }
   body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: #0d1117; color: #e6edf3; }
@@ -148,7 +148,7 @@
     <span>Decimales: <b>3</b></span>
     <span>Muestras: <b id="rec-val">0</b></span>
     <span>Modo acc: <b id="mode-val">—</b></span>
-    <span>Build: <b id="build-val">v3.1</b></span>
+    <span>Build: <b id="build-val">v3.2</b></span>
     <span class="pill" id="db-val">persistencia: —</span>
   </div>
 
@@ -179,67 +179,23 @@
   <details>
     <summary>Notas técnicas / qué cambió respecto a v1</summary>
     <div class="note">
-      <p><strong>Detector de pasos (v3).</strong> Cuenta <strong>máximos locales</strong> de la señal lineal:
+      <p><strong>Detector de pasos (v3).</strong> Cuenta <strong>máximos locales</strong>[cite: 2] de la señal lineal:
       un paso se registra en el instante en que la señal deja de subir, de modo que el valor del pico es
-      exacto. Para aceptar el siguiente paso sólo hace falta que la señal haya descendido por debajo del
+      exacto[cite: 2]. Para aceptar el siguiente paso sólo hace falta que la señal haya descendido por debajo del
       <strong>70 % del pico anterior</strong> —no de un umbral absoluto—, así que un valle poco profundo
-      (cadencia rápida) no bloquea la detección. Umbral adaptativo = media + K·σ sobre los últimos ~1 s
-      (K ajustable) y periodo refractario de 200 ms (permite hasta ~3 pasos/s).</p>
-
-      <p><strong>Antes (v2) el detector se «atascaba»:</strong> exigía que la aceleración volviera por debajo del
-      55 % del umbral para rearmar. Al caminar rápido el valle nunca llegaba a ese nivel, el estado «activo»
-      se mantenía y el <em>timeout</em> de 1500 ms acababa contando un solo paso por segundo en vez de
-      varios: de ahí la sensación de «tiesura» y de pasos perdidos.</p>
+      (cadencia rápida) no bloquea la detección[cite: 2]. Umbral adaptativo = media + K·σ sobre los últimos ~1 s
+      (K ajustable) y periodo refractario de 200 ms (permite hasta ~3 pasos/s)[cite: 2].</p>
 
       <p><strong>Filtro de gravedad.</strong> La gravedad se estima con un EMA de <strong>α = 0,08</strong>
-      (antes 0,90). Con α alto la estimación de gravedad <em>persigue</em> al impacto y <strong>aplana el
-      pico</strong> del paso; con α bajo el pico pasa intacto. La primera muestra inicializa la estimación
-      para que no aparezca un transitorio de ~9,8 m/s² al arrancar (que dispararía un paso falso).
-      El α y la sensibilidad K son ajustables en vivo.</p>
+      (antes 0,90)[cite: 2]. Con α alto la estimación de gravedad <em>persigue</em> al impacto y <strong>aplana el
+      pico</strong> del paso; con α bajo el pico pasa intacto[cite: 2]. La primera muestra inicializa la estimación
+      para que no aparezca un transitorio de ~9,8 m/s² al arrancar[cite: 2].</p>
 
-      <p><strong>Zancada.</strong> El pico de impacto se normaliza contra la media de los últimos 20 picos,
-      de modo que el rango «mínima/máxima» que se introduce equivale al recorrido habitual del usuario
-      y no depende de la ganancia del filtro ni de lo rápido que camine.</p>
-
-      <p><strong>Precisión.</strong> Los valores se guardan internamente con precisión completa de <code>float</code>;
-      la pantalla y el CSV los muestran con <strong>exactamente 3 decimales</strong> (v1 usaba 1 decimal).</p>
-
-      <p><strong>Muestreo con pico preservado.</strong> <code>devicemotion</code> entrega ~60 Hz. En v1 se guardaba
-      únicamente la última muestra de cada ventana de 50 ms, por lo que el pico de impacto (que dura 20–40 ms)
-      se perdía en la tabla y en el CSV. Ahora se conserva la muestra de <strong>máxima magnitud lineal</strong> de
-      cada ventana, mientras la <em>detección</em> de pasos sigue corriendo a la frecuencia nativa del sensor.</p>
-
-      <p><strong>Detector de pasos.</strong> Umbral adaptativo (media + K·σ sobre los últimos ~1 s),
-      <strong>rearmado por descenso</strong> respecto al pico anterior (70 %) y periodo refractario de 200 ms.</p>
-
-      <p><strong>Compensación de inclinación.</strong> Se estima la gravedad con un filtro de paso bajo (EMA α=0,08)
-      y se resta, de modo que el umbral ya no depende de cómo se sujeta el móvil.</p>
-
-      <p><strong>Rumbo real.</strong> v1 usaba <code>alpha</code> de <code>deviceorientation</code>, que es
-      <em>relativo</em> a la orientación de arranque del sensor (no es norte). Ahora:
-      (1) el giroscopio se integra con la matriz de rotación correcta según la postura del móvil,
-      (2) el magnetómetro corrige lentamente al giroscopio (filtro complementario),
-      (3) en iOS <code>webkitCompassHeading</code> ya viene en <em>norte verdadero</em>, por lo que ya <u>no</u> se
-      le suma la declinación (en v1 se corregía dos veces, con 6.5° de error).</p>
-
-      <p><strong>ZUPT.</strong> Cuando el usuario está quieto (aceleración lineal ~0 y giro ~0 durante 1.2 s) se
-      congela la deriva del giroscopio.</p>
-
-      <p><strong>Permisos iOS 13+.</strong> Ahora se piden <code>DeviceMotionEvent</code> <em>y</em>
-      <code>DeviceOrientationEvent</code>; con v1 el magnetómetro nunca llegaba a dar datos en iPhone.</p>
-
-      <p><strong>Otras correcciones.</strong> Nombre de CSV sin «:» (inválido en Windows), mapa y trayectoria
-      calculados con la <em>misma</em> zancada real (v1 dibujaba con 0.75 m fijo y divergía del cálculo real),
-      tabla actualizada por lotes (v1 insertaba 20 filas/s con innerHTML), temporizador con corrección de deriva,
-      pausa/reanudación con <code>visibilitychange</code>, estado completo reiniciado al parar y persistencia en
-      IndexedDB para no perder la sesión al recargar.</p>
+      <p><strong>Rumbo real y Filtro Complementario (v3.2).</strong> Se ha corregido la integración y fusión del giroscopio con el magnetómetro para que el estado de rumbo (`gyroH`) mantenga la corrección continua y evite derivas o saltos en pantalla[cite: 2].</p>
     </div>
     <div class="note">
       <p><strong>Build <span id="build-note">—</span>.</strong> El número de versión aparece en el título, en la barra
-      de estado y en la cabecera del CSV. GitHub Pages cachea el HTML: si subes un cambio y el móvil sigue
-      mostrando la versión anterior, es la caché, no tu push — recarga con <code>Ctrl+F5</code> (Android)
-      o vaciando la caché del navegador (iOS). La build se incrementa en la constante
-      <code>BUILD</code> al principio del script.</p>
+      de estado y en la cabecera del CSV[cite: 2].</p>
     </div>
   </details>
 </main>
@@ -250,37 +206,28 @@
 'use strict';
 
 /* ========================= CONFIGURACIÓN ========================= */
-const BUILD       = 'v3.1';   // marcador de versión: visible en pantalla, título y CSV
+const BUILD       = 'v3.2';   // marcador de versión
 const SAMPLE_MS   = 50;      // ventana del registro (ms)
 const DEC         = 3;       // decimales de salida
-// LPF de gravedad. Con α alto la estimación de gravedad "persigue" el impacto y
-// APLANA el pico del paso (a 2 Hz la atenuación con α=0.90 es casi nula).
-// Con α bajo el pico pasa intacto; el coste es una convergencia más lenta,
-// que se compensa inicializando la gravedad con la primera muestra.
 const GRAV_ALPHA  = 0.08;
 const DB_NAME     = 'pdr-log-v2';
 const ST_RECORDS  = 'records';
 const ST_STEPS    = 'steps';
 
-/**
- * Detector de pasos: máximos locales con rearmado por DESCENSO relativo al pico
- * anterior (no respecto al umbral), para que un valle poco profundo no bloquee
- * la detección de pasos rápidos.
- */
 const STEP_CFG = {
-  refractoryMs: 200,   // mínimo entre pasos  -> permite hasta ~3 pasos/s (180 ppm)
-  minDescent:  0.70,   // hay que bajar al 70 % del pico anterior para rearmar
-  minProm:     0.15,   // el pico debe destacar sobre el valle (fracción del umbral)
-  thrFloor:    0.80,   // umbral mínimo de detección (m/s²)
-  thrK:        1.00,   // umbral = media + K·σ
-  histLen:     60      // ventana del estadístico (~1 s a 60 Hz)
+  refractoryMs: 200,   
+  minDescent:  0.70,   
+  minProm:     0.15,   
+  thrFloor:    0.80,   
+  thrK:        1.00,   
+  histLen:     60      
 };
 
 const $ = id => document.getElementById(id);
 const clamp = (v,a,b) => v < a ? a : (v > b ? b : v);
 const num   = v => (typeof v === 'number' && Number.isFinite(v)) ? v : 0;
 const toRad = d => d * Math.PI / 180;
-const circDiff = (a,b) => ((b - a + 540) % 360) - 180;          // -180..180
+const circDiff = (a,b) => ((b - a + 540) % 360) - 180;          
 const circLerp = (a,b,t) => (a + circDiff(a,b) * t + 360) % 360;
 const fmt  = (v,d = DEC) => (v === null || v === undefined || Number.isNaN(v)) ? '' : Number(v).toFixed(d);
 const avg  = a => a.length ? a.reduce((x,y) => x + y, 0) / a.length : 0;
@@ -293,8 +240,8 @@ const ctx    = canvas.getContext('2d');
 /* ========================= ESTADO ========================= */
 const S = {
   running: false,
-  records: [],            // log de 50 ms
-  steps: [],              // eventos de paso
+  records: [],            
+  steps: [],              
   totalSteps: 0,
   totalDistance: 0,
   lastStride: 0.75,
@@ -307,61 +254,56 @@ const S = {
   pendingStep: null,
   stepSeq: 0,
 
-  // brújula / giroscopio
-  beta: 90, gamma: 0,                 // postura (Auto los actualiza desde el sensor)
+  beta: 90, gamma: 0,                 
   haveTilt: false,
-  posture: 'auto', invertYaw: false,  // ajustes cacheados (no leer el DOM a 60 Hz)
-  gravAlpha: GRAV_ALPHA,             // α del filtro de gravedad (ajustable)
-  thrK: STEP_CFG.thrK,               // sensibilidad del umbral (ajustable)
+  posture: 'auto', invertYaw: false,  
+  gravAlpha: GRAV_ALPHA,             
+  thrK: STEP_CFG.thrK,               
   refractoryMs: STEP_CFG.refractoryMs,
-  compass: null,                      // rumbo del magnetómetro (grados)
-  compassTrue: false,                 // ¿ya viene en norte verdadero? (iOS)
-  compassWeight: 0,                   // peso de la corrección complementaria
-  gyroH: null,                        // heading integrado (absoluto)
+  compass: null,                      
+  compassTrue: false,                 
+  compassWeight: 0,                   
+  gyroH: null,                        
   gyroInit: false,
   gyroBias: 0,
-  headingOffset: 0,                   // calibración del usuario (0 = calibrado)
-  heading: null,                      // heading fusionado ya compensado
+  headingOffset: 0,                   
+  heading: null,                      
   headingSource: '—',
   lastYawRate: 0,
-  conf: 0,                            // confianza en el rumbo (0-100 %)
+  conf: 0,                            
 
-  // detector
   gravity: { x:0, y:0, z:0 },
   gravityInit: false,
   linMag: 0,
   linX: 0, linY: 0, linZ: 0,
   hist: [],
-  peak: 0,            // seguimiento del máximo local en curso
-  valley: Infinity,    // mínimo desde el último pico de referencia
-  lastPeak: null,     // último pico contado (para el rearmado por descenso)
-  descentOk: true,    // ¿la señal ya ha descendido lo suficiente?
-  peakHist: [],       // historial de picos (normalización adaptativa de la zancada)
+  peak: 0,            
+  valley: Infinity,    
+  lastPeak: null,     
+  descentOk: true,    
+  peakHist: [],       
   lastStepT: 0,
   thrHigh: 0.8,
   thrLow: 0.56,
   accMode: 'none',
 
-  // quiet / ZUPT
   quietSince: null,
 
-  // sensores
   motionCount: 0,
   lastMotionT: 0,
   hzMark: performance.now(),
   hz: 0,
   orientationCount: 0,
 
-  // trayectoria
+  // Trayectoria inicializada en 0 con límites anclados al origen (0,0)
   x: 0, y: 0,
-  minX: -1, maxX: 1, minY: -1, maxY: 1,
+  minX: 0, maxX: 0, minY: 0, maxY: 0,
   view: { zoom: 1, ox: 0, oy: 0, manual: false },
 
-  // persistencia
   db: null, persistedRec: 0, persistedStep: 0
 };
 
-const rawBuf = [];   // muestras crudas del sensor dentro de la ventana actual
+const rawBuf = [];   
 let lastSample = { t:0, ax:0, ay:0, az:0, wx:0, wy:0, wz:0, lin:0, yaw:0 };
 
 /* ========================= UTILIDADES UI ========================= */
@@ -383,7 +325,7 @@ async function requestSensors() {
   if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function')
     need.push(DeviceMotionEvent);
   if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function')
-    need.push(DeviceOrientationEvent);           // iOS 13+: necesario para el magnetómetro
+    need.push(DeviceOrientationEvent);           
 
   if (need.length) {
     try {
@@ -429,7 +371,6 @@ function stopListening() {
   persistNow();
 }
 
-/** Reinicia por completo el estado de sensado (no el historial). */
 function resetDetector() {
   S.gravity = { x:0, y:0, z:0 };
   S.gravityInit = false;
@@ -454,38 +395,28 @@ function resetAll() {
   stopListening();
   S.records.length = 0; S.steps.length = 0;
   S.totalSteps = 0; S.totalDistance = 0; S.stepSeq = 0; S.pendingStep = null;
-  S.x = 0; S.y = 0; S.minX = -1; S.maxX = 1; S.minY = -1; S.maxY = 1;
+  S.x = 0; S.y = 0; S.minX = 0; S.maxX = 0; S.minY = 0; S.maxY = 0;
   S.view = { zoom: 1, ox: 0, oy: 0, manual: false };
   S.sessionStart = null; S.sessionStartMs = 0;
   S.persistedRec = 0; S.persistedStep = 0;
   resetDetector();
 
   $('step-count').textContent = '0';
-  $('cadence-sub').textContent = '— ppm';
-  $('dist-val').textContent   = '0.000 m';
-  $('zancada-sub').textContent = 'zancada 0.750 m';
-  $('heading-val').textContent = '--';
-  $('heading-src').textContent = 'sin fuente';
-  $('compass-val').textContent = '--';
-  $('acc-val').textContent = '0.000, 0.000, 0.000';
-  $('gyro-val').textContent = '0.000, 0.000, 0.000';
-  $('yaw-val').textContent  = '0.000 °/s';
-  $('hz-val').textContent   = '0 Hz';
-  $('conf-val').textContent = '--';
-  $('quiet-sub').textContent = '—';
-  $('rec-val').textContent  = '0';
-  $('sess-val').textContent = '--------';
-  $('mode-val').textContent = '—';
-  $('acc-sub').textContent  = 'con gravedad';
-  $('log').innerHTML = '';
-  $('table-title').textContent = 'Registro general [--------] (cada 50 ms · pico preservado)';
+  $('cadence-sub').textContent = '— ppm';$('dist-val').textContent   = '0.000 m';
+  $('zancada-sub').textContent = 'zancada 0.750 m';$('heading-val').textContent = '--';
+  $('heading-src').textContent = 'sin fuente';$('compass-val').textContent = '--';
+  $('acc-val').textContent = '0.000, 0.000, 0.000';$('gyro-val').textContent = '0.000, 0.000, 0.000';
+  $('yaw-val').textContent  = '0.000 °/s';$('hz-val').textContent   = '0 Hz';
+  $('conf-val').textContent = '--';$('quiet-sub').textContent = '—';
+  $('rec-val').textContent  = '0';$('sess-val').textContent = '--------';
+  $('mode-val').textContent = '—';$('acc-sub').textContent  = 'con gravedad';
+  $('log').innerHTML = '';$('table-title').textContent = 'Registro general [--------] (cada 50 ms · pico preservado)';
   setState('Detenido', 'sub2 warning');
   $('state-sub').textContent = 'sin sesión';
   drawMap();
   clearStore();
 }
 
-/* ========================= TICK (50 ms, con corrección de deriva) ========================= */
 function scheduleTick() {
   if (!S.running) return;
   const drift = performance.now() - S.lastTick;
@@ -497,21 +428,17 @@ document.addEventListener('visibilitychange', () => {
   else if (S.running && !S.timer) { S.lastTick = performance.now(); scheduleTick(); }
 });
 
-/* ========================= SENSORES ========================= */
 function onMotion(e) {
   const t = performance.now();
   const dt = S.lastMotionT === 0 ? 0 : clamp((t - S.lastMotionT) / 1000, 0, 0.2);
   S.lastMotionT = t;
 
-  /* --- acelerómetro --- */
   let ax, ay, az, lin, mode;
   const gA = e.accelerationIncludingGravity;
   if (gA && (typeof gA.x === 'number' || typeof gA.y === 'number' || typeof gA.z === 'number')) {
     ax = num(gA.x); ay = num(gA.y); az = num(gA.z);
     const g = S.gravity;
     if (!S.gravityInit) {
-      // primera muestra: inicializar con el valor medido evita el transitorio
-      // de convergencia (que valdría ~9,8 m/s² y dispararía un paso falso)
       g.x = ax; g.y = ay; g.z = az;
       S.gravityInit = true;
     } else {
@@ -532,27 +459,22 @@ function onMotion(e) {
   const linMag = Math.hypot(lin.x, lin.y, lin.z);
   S.linMag = linMag;
 
-  /* --- giroscopio: ejes del dispositivo + yaw sobre la vertical del mundo --- */
   const rr = e.rotationRate || {};
-  const wx = num(rr.beta);    // rotación sobre el eje X del dispositivo
-  const wy = num(rr.gamma);   // rotación sobre el eje Y del dispositivo
-  const wz = num(rr.alpha);   // rotación sobre el eje Z del dispositivo
+  const wx = num(rr.beta);    
+  const wy = num(rr.gamma);   
+  const wz = num(rr.alpha);   
   const yawRate = computeYawRate(wx, wy, wz);
 
-  /* --- integración del rumbo + fusión con el magnetómetro --- */
   updateHeading(t, dt, yawRate);
 
-  /* --- ZUPT: quieto -> congelar la deriva del giroscopio --- */
   if (linMag < 0.35 && Math.abs(yawRate) < 0.08) { if (S.quietSince === null) S.quietSince = t; }
   else S.quietSince = null;
   if (S.quietSince !== null && t - S.quietSince > 1200) {
     S.gyroBias = S.gyroBias * 0.98 + (yawRate - S.gyroBias) * 0.02;
   }
 
-  /* --- detección de pasos (a frecuencia nativa) --- */
   detectStep(t, linMag);
 
-  /* --- buffer de muestras para el registro de 50 ms --- */
   rawBuf.push({ t, ax, ay, az, wx, wy, wz, lin: linMag, yaw: yawRate });
   if (rawBuf.length > 800) rawBuf.shift();
 
@@ -562,16 +484,10 @@ function onMotion(e) {
   if (now2 - S.hzMark >= 500) {
     S.hz = Math.round(S.motionCount * 1000 / (now2 - S.hzMark));
     S.motionCount = 0; S.hzMark = now2;
-    $('hz-val').textContent = S.hz + ' Hz';
-    $('sig-sub').textContent = S.hz > 0 ? 'sensor activo' : 'sin señal';
+    $('hz-val').textContent = S.hz + ' Hz';$('sig-sub').textContent = S.hz > 0 ? 'sensor activo' : 'sin señal';
   }
 }
 
-/**
- * Componente de la velocidad angular sobre la vertical del mundo (yaw).
- * ω_world.z = -cosβ·sinγ·ωx + sinβ·ωy + cosβ·cosγ·ωz
- * (β,γ: inclinación del dispositivo; ωx,ωy,ωz: velocidades en ejes del dispositivo)
- */
 function computeYawRate(wx, wy, wz) {
   let b, g;
   if (S.posture === 'vertical') { b = 90; g = 0; }
@@ -585,43 +501,38 @@ function computeYawRate(wx, wy, wz) {
   return yaw;
 }
 
+/**
+ * MEJORA DE CÁLCULO (v3.2): Se actualiza S.gyroH directamente con el resultado de la fusión
+ * del filtro complementario para que la corrección del magnetómetro persista en el estado.
+ */
 function updateHeading(t, dt, yawRate) {
   if (S.gyroH === null) S.gyroH = 0;
 
-  // 1) integrar giroscopio (yaw positivo antihorario => el rumbo sentido horario disminuye)
   if (dt > 0) S.gyroH = (S.gyroH - (yawRate - S.gyroBias) * dt + 360) % 360;
 
-  // 2) fusionar con el magnetómetro (corrección lenta)
-  let abs;
   if (S.compass !== null) {
-    abs = circLerp(S.gyroH, S.compass, S.compassWeight);
+    S.gyroH = circLerp(S.gyroH, S.compass, S.compassWeight);
     S.headingSource = S.compassTrue ? 'giroscopio + magnetómetro (norte verdadero)'
                                      : 'giroscopio + magnetómetro (norte magnético)';
   } else {
-    abs = S.gyroH;
     S.headingSource = 'solo giroscopio (relativo)';
   }
-  S.heading = (abs - S.headingOffset + 360) % 360;
+  S.heading = (S.gyroH - S.headingOffset + 360) % 360;
   updateConfidence();
 }
 
-/**
- * Confianza del rumbo: base según la fuente disponible y penalización por
- * discrepancia entre giroscopio y magnetómetro (y por giros muy rápidos).
- */
 function updateConfidence() {
   let c;
   if (S.compass === null) {
-    c = 35;                                     // solo giroscopio: deriva garantizada
+    c = 35;                                     
   } else {
     const diff = Math.abs(circDiff(S.gyroH === null ? S.compass : S.gyroH, S.compass));
     c = 95 - Math.min(55, diff * 1.2);
-    if (Math.abs(S.lastYawRate) > 60) c -= 15;   // giro rápido: brújula menos fiable
+    if (Math.abs(S.lastYawRate) > 60) c -= 15;   
   }
   S.conf = clamp(c, 0, 100);
 }
 
-/* --- magnetómetro / orientación --- */
 function onOrientation(e) { handleOrientation(e, false); }
 function onOrientationAbsolute(e) { handleOrientation(e, true); }
 
@@ -634,13 +545,13 @@ function handleOrientation(e, absolute) {
   let heading = null, isTrue = false, weight = 0;
 
   if (typeof e.webkitCompassHeading === 'number' && !Number.isNaN(e.webkitCompassHeading)) {
-    heading = e.webkitCompassHeading;    // iOS: ya viene en norte verdadero -> NO sumar declinación
+    heading = e.webkitCompassHeading;    
     isTrue = true;  weight = 0.03;
   } else if (absolute && typeof e.alpha === 'number') {
-    heading = (360 - e.alpha) % 360;      // Android absoluto: norte magnético -> sumar declinación
+    heading = (360 - e.alpha) % 360;      
     isTrue = false; weight = 0.03;
   } else if (typeof e.alpha === 'number') {
-    heading = (360 - e.alpha) % 360;      // relativo al arranque del sensor: solo corrige deriva
+    heading = (360 - e.alpha) % 360;      
     isTrue = false; weight = 0.008;
   }
 
@@ -651,37 +562,17 @@ function handleOrientation(e, absolute) {
   }
 }
 
-/* ========================= DETECCIÓN DE PASOS ========================= */
-/**
- * Detector por MÁXIMOS LOCALES.
- *
- * Por qué no "umbral que se rearma al bajar por debajo de X":
- *   - Si se exige bajar por debajo de un umbral absoluto, al caminar rápido el
- *     valle nunca llega y el detector se queda bloqueado -> se pierden pasos.
- *   - Si en cambio se rearma demasiado pronto (p. ej. al 80 % del umbral), un
- *     mismo impacto se puede partir en dos -> pasos duplicados.
- *
- * La solución: el paso se cuenta en el MÁXIMO LOCAL (la señal deja de subir), y
- * para aceptar el siguiente paso sólo hace falta que la señal haya descendido
- * por debajo del 70 % del pico anterior. Es independiente de la profundidad
- * del valle, así que no bloquea la cadencia rápida, y sigue impidiendo que un
- * mismo impacto se cuente dos veces.
- */
 function detectStep(t, v) {
-  // 1) umbral adaptativo sobre ~1 s de la señal lineal
   const hist = S.hist;
   const thr = Math.max(STEP_CFG.thrFloor, avg(hist) + S.thrK * std(hist));
   S.thrHigh = thr;
   hist.push(v);
   if (hist.length > STEP_CFG.histLen) hist.shift();
 
-  // 2) seguimiento del pico/valle
-  if (v >= S.peak) { S.peak = v; return; }   // la señal sigue subiendo
+  if (v >= S.peak) { S.peak = v; return; }   
 
-  // 3) la señal ha bajado -> puede ser el final de un impacto
   const peak = S.peak;
 
-  // ¿ha descendido ya lo suficiente respecto al último pico contado?
   if (S.lastPeak !== null && v < S.lastPeak * STEP_CFG.minDescent) S.descentOk = true;
   S.thrLow = S.lastPeak !== null ? S.lastPeak * STEP_CFG.minDescent : thr;
 
@@ -693,9 +584,9 @@ function detectStep(t, v) {
       (t - S.lastStepT) >= S.refractoryMs) {
     finalizeStep(t, peak);
     S.lastStepT = t;
-    S.lastPeak  = peak;      // el siguiente pico exige otro descenso
+    S.lastPeak  = peak;      
     S.descentOk = false;
-    S.valley    = peak;      // nuevo valle de referencia
+    S.valley    = peak;      
   } else {
     if (v < S.valley) S.valley = v;
   }
@@ -707,9 +598,6 @@ function finalizeStep(t, peak) {
   const maxS = clamp(parseFloat($('maxStride').value) || 0.981, 0.2, 2.5);
   const lo = Math.min(minS, maxS), hi = Math.max(minS, maxS);
 
-  // Normalización adaptativa del pico: el pico se compara con la media de los
-  // últimos picos, de modo que la zancada no dependa de la ganancia del filtro
-  // de gravedad ni del estilo de marcha (rápida/lenta) del usuario.
   const ph = S.peakHist;
   ph.push(peak);
   if (ph.length > 20) ph.shift();
@@ -722,20 +610,21 @@ function finalizeStep(t, peak) {
   S.strideEMA = S.strideEMA * (1 - a) + raw * a;
   S.lastStride = S.strideEMA;
 
-  // avance según el rumbo fusionado
   const hdg = S.heading === null ? 0 : S.heading;
   const rad = toRad(hdg);
   S.x += S.strideEMA * Math.sin(rad);
   S.y += S.strideEMA * Math.cos(rad);
-  S.minX = Math.min(S.minX, S.x); S.maxX = Math.max(S.maxX, S.x);
-  S.minY = Math.min(S.minY, S.y); S.maxY = Math.max(S.maxY, S.y);
+  
+  // MEJORA DE CÁLCULO (v3.2): Anclaje robusto del origen (0,0) en los límites de visualización del mapa
+  S.minX = Math.min(0, S.minX, S.x); S.maxX = Math.max(0, S.maxX, S.x);
+  S.minY = Math.min(0, S.minY, S.y); S.maxY = Math.max(0, S.maxY, S.y);
 
   S.totalSteps++;
   S.totalDistance += S.strideEMA;
   S.stepSeq++;
 
   const step = {
-    n: S.stepSeq, t: Math.round(t - S.sessionStartMs), at: t,   // t = relativo, at = absoluto
+    n: S.stepSeq, t: Math.round(t - S.sessionStartMs), at: t,   
     x: S.x, y: S.y, stride: S.strideEMA, heading: hdg, peak
   };
   S.steps.push(step);
@@ -759,7 +648,6 @@ function updateCadence(t) {
   $('cadence-sub').textContent = ppm + ' ppm';
 }
 
-/* ========================= REGISTRO DE 50 ms ========================= */
 function recordSample() {
   const t = performance.now();
   const winStart = t - SAMPLE_MS;
@@ -768,7 +656,6 @@ function recordSample() {
   if (!win.length) win = lastSample.t > winStart ? [lastSample] : [];
   if (!win.length) return;
 
-  // muestra con mayor magnitud lineal (preserva el pico de impacto)
   let peak = win[0];
   for (const s of win) if (s.lin > peak.lin) peak = s;
 
@@ -783,8 +670,6 @@ function recordSample() {
     stepMatch: '',
     x: S.x, y: S.y
   };
-  // asociar el paso al ciclo en el que ha ocurrido (el paso se confirma al bajar el pico,
-  // por eso puede caer en la ventana siguiente a la del pico)
   if (S.pendingStep && S.pendingStep.at > winStart && S.pendingStep.at <= t + 50) {
     rec.stepMatch = S.pendingStep.n;
     S.pendingStep = null;
@@ -794,14 +679,12 @@ function recordSample() {
   queueRow(rec);
   $('rec-val').textContent = S.records.length;
 
-  // purgar lo ya registrado
   let cut = 0;
   while (cut < rawBuf.length && rawBuf[cut].t <= winStart) cut++;
   if (cut > 0) rawBuf.splice(0, cut);
   schedulePersist();
 }
 
-/* ========================= TABLA (escritura por lotes) ========================= */
 const pendingRows = [];
 function queueRow(r) { pendingRows.push(r); if (pendingRows.length > 600) pendingRows.shift(); }
 
@@ -832,7 +715,6 @@ setInterval(() => {
   while ($('log').children.length > 300) $('log').lastChild.remove();
 }, 500);
 
-/* ========================= MAPA ========================= */
 function drawMap() {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.clientWidth, h = canvas.clientHeight;
@@ -853,7 +735,6 @@ function drawMap() {
   const px = rx => w/2 + (rx - cx) * scale + S.view.ox;
   const py = ry => h/2 - (ry - cy) * scale + S.view.oy;
 
-  // rejilla
   const gridStep = niceStep(rangeX / 6);
   ctx.strokeStyle = '#161b22'; ctx.lineWidth = 1;
   ctx.fillStyle = '#30363d'; ctx.font = '10px ui-monospace, monospace';
@@ -868,26 +749,21 @@ function drawMap() {
     ctx.fillText(gy.toFixed(1) + ' m', 4, Y - 4);
   }
 
-  // trayectoria
   if (S.steps.length > 1) {
     ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
     ctx.beginPath(); ctx.moveTo(px(0), py(0));
     for (const s of S.steps) ctx.lineTo(px(s.x), py(s.y));
     ctx.stroke();
   }
-  // puntos de paso
   ctx.fillStyle = '#1f6feb';
   for (const s of S.steps) { ctx.beginPath(); ctx.arc(px(s.x), py(s.y), 2.6, 0, Math.PI*2); ctx.fill(); }
 
-  // inicio
   ctx.fillStyle = '#238636'; ctx.beginPath(); ctx.arc(px(0), py(0), 5.5, 0, Math.PI*2); ctx.fill();
-  // posición actual
   if (S.steps.length) {
     ctx.fillStyle = '#4ade80'; ctx.beginPath(); ctx.arc(px(S.x), py(S.y), 6, 0, Math.PI*2); ctx.fill();
     ctx.strokeStyle = '#0d1117'; ctx.lineWidth = 1.5; ctx.stroke();
   }
 
-  // flecha de rumbo
   if (S.heading !== null && S.steps.length) {
     const X = px(S.x), Y = py(S.y), rad = toRad(S.heading), L = 26;
     const dirX = Math.sin(rad), dirY = -Math.cos(rad);
@@ -899,7 +775,6 @@ function drawMap() {
     ctx.fill();
   }
 
-  // leyenda
   ctx.fillStyle = '#8b949e'; ctx.font = '11px system-ui';
   ctx.fillText('▲ inicio   ● actual   — recorrido   — rumbo', 8, 16);
   ctx.fillText('escala ≈ ' + (scale ? (1/scale).toFixed(2) : '—') + ' m/px', w - 108, 16);
@@ -911,7 +786,6 @@ function niceStep(v) {
   return (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * p;
 }
 
-/* pan / zoom del mapa */
 let drag = null;
 canvas.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, ox: S.view.ox, oy: S.view.oy }; canvas.setPointerCapture(e.pointerId); });
 canvas.addEventListener('pointermove', e => {
@@ -932,7 +806,6 @@ canvas.addEventListener('wheel', e => {
 
 function centerMap() { S.view.zoom = 1; S.view.ox = 0; S.view.oy = 0; S.view.manual = false; drawMap(); }
 
-/* ========================= ESTADO / HUD ========================= */
 function setState(text, cls) {
   const el = $('state-val');
   el.textContent = text;
@@ -956,7 +829,6 @@ setInterval(() => {
   $('thr-val').textContent = fmt(S.thrHigh) + ' / ' + fmt(S.thrLow);
   $('conf-val').textContent = S.running ? Math.round(S.conf) + ' %' : '--';
   $('conf-sub').textContent = S.compass !== null ? 'giroscopio + magnetómetro' : 'solo giroscopio';
-  // watchdog de inmovilidad
   if (S.running && S.lastStepT > 0 && (performance.now() - S.lastStepT) > 2500) {
     setState('Quieto', 'sub2 warning');
     $('state-sub').textContent = 'sin pasos detectados';
@@ -964,7 +836,6 @@ setInterval(() => {
   if ($('autoFit').checked && S.steps.length) drawMap();
 }, 200);
 
-/* ========================= CALIBRACIÓN ========================= */
 $('calibBtn').onclick = () => {
   if (!S.running) { toast('Inicia los sensores primero'); return; }
   const abs = S.compass !== null
@@ -978,7 +849,6 @@ $('calibBtn').onclick = () => {
     : 'Calibrado sin magnetómetro: 0° = dirección actual');
 };
 
-/* ========================= EXPORTAR CSV ========================= */
 function exportCSV() {
   if (!S.records.length) { toast('No hay datos que exportar'); return; }
   const head = [
@@ -1006,13 +876,12 @@ function exportCSV() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'PDR_' + (S.sessionStart || 'sesion') + '.csv';   // sin ':' -> válido en Windows
+  a.download = 'PDR_' + (S.sessionStart || 'sesion') + '.csv';   
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1500);
   toast('CSV exportado (' + S.records.length + ' muestras)');
 }
 
-/* ========================= PERSISTENCIA (IndexedDB) ========================= */
 function openDB() {
   return new Promise((res, rej) => {
     if (!('indexedDB' in window)) return rej(new Error('IndexedDB no disponible'));
@@ -1064,7 +933,7 @@ async function persistNow() {
       });
       S.persistedStep = S.steps.length;
     }
-  } catch (e) { /* silencioso: la persistencia no debe romper la captura */ }
+  } catch (e) {}
 }
 async function clearStore() {
   if (!S.db) return;
@@ -1102,7 +971,8 @@ async function checkStored() {
       S.persistedRec = S.records.length; S.persistedStep = S.steps.length;
       if (S.steps.length) {
         const last = S.steps[S.steps.length - 1];
-        S.x = last.x; S.y = last.y; S.minX = S.maxX = S.x; S.minY = S.maxY = S.y;
+        S.x = last.x; S.y = last.y; 
+        S.minX = 0; S.maxX = 0; S.minY = 0; S.maxY = 0;
         for (const st of S.steps) {
           S.minX = Math.min(S.minX, st.x); S.maxX = Math.max(S.maxX, st.x);
           S.minY = Math.min(S.minY, st.y); S.maxY = Math.max(S.maxY, st.y);
@@ -1121,7 +991,6 @@ async function checkStored() {
   } catch (e) {}
 }
 
-/* ========================= BOTONES ========================= */
 $('startBtn').onclick = requestSensors;
 $('stopBtn').onclick  = stopListening;
 $('exportBtn').onclick = exportCSV;
@@ -1150,7 +1019,6 @@ $('refractory').onchange = () => {
 window.addEventListener('resize', drawMap);
 window.addEventListener('beforeunload', () => { persistNow(); });
 
-/* ========================= ARRANQUE ========================= */
 $('build-val').textContent = BUILD;
 $('build-note').textContent = BUILD;
 $('app-title').textContent = 'Registro Unificado ' + BUILD + ' — Muestreo 50 ms · 3 decimales';
