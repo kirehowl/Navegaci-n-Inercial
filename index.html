@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Registro Unificado v2 (50 ms · 3 decimales · PDR)</title>
+<title>Registro Unificado v3.1 (50 ms · 3 decimales · PDR)</title>
 <style>
   :root { color-scheme: dark; }
   body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: #0d1117; color: #e6edf3; }
@@ -61,7 +61,7 @@
 </head>
 <body>
 <main>
-  <h1>Registro Unificado v2 — Muestreo 50 ms · 3 decimales</h1>
+  <h1 id="app-title">Registro Unificado — Muestreo 50 ms · 3 decimales</h1>
   <p class="sub">PDR: detección de pasos con pico preservado · rumbo gyro+magnetómetro · ZUPT · persistencia IndexedDB</p>
 
   <div id="restoreBanner" class="banner" style="display:none">
@@ -81,6 +81,7 @@
     <div class="card"><div class="label">Giroscopio (ejes dispositivo)</div><div class="value sm" id="gyro-val">0.000, 0.000, 0.000</div><div class="sub2" id="gyro-sub">ωx, ωy, ωz</div></div>
     <div class="card"><div class="label">Yaw (vertical)</div><div class="value sm" id="yaw-val">0.000 °/s</div><div class="sub2" id="quiet-sub">—</div></div>
     <div class="card"><div class="label">Frecuencia sensor</div><div class="value sm" id="hz-val">0 Hz</div><div class="sub2" id="sig-sub">sin señal</div></div>
+    <div class="card"><div class="label">Umbral / Rearme</div><div class="value sm" id="thr-val">0.800 / 0.560</div><div class="sub2">m/s² · detección / rearmado</div></div>
     <div class="card"><div class="label">Confianza rumbo</div><div class="value sm" id="conf-val">--</div><div class="sub2" id="conf-sub">—</div></div>
   </div>
 
@@ -111,6 +112,21 @@
       <label class="label">Filtro de zancada (EMA)</label>
       <input id="emaAlpha" type="number" step="0.05" min="0.05" max="1" value="0.30">
     </div>
+    <div>
+      <label class="label">Filtro de gravedad (α)</label>
+      <input id="gravAlpha" type="number" step="0.01" min="0.01" max="0.5" value="0.08">
+      <div class="sub2">Bajo = pico intacto · alto = pico aplastado</div>
+    </div>
+    <div>
+      <label class="label">Sensibilidad del paso (K)</label>
+      <input id="thrK" type="number" step="0.1" min="0.3" max="2.5" value="1.0">
+      <div class="sub2">Umbral = media + K·σ · bajo = más sensible</div>
+    </div>
+    <div>
+      <label class="label">Refractario (ms)</label>
+      <input id="refractory" type="number" step="10" min="120" max="600" value="200">
+      <div class="sub2">Mínimo entre pasos · bajo = más cadencia</div>
+    </div>
     <div style="display:flex; flex-direction:column; gap:6px; justify-content:center">
       <label class="check"><input type="checkbox" id="invertYaw"> Invertir signo de giro</label>
       <label class="check"><input type="checkbox" id="autoFit" checked> Auto-ajustar el mapa</label>
@@ -132,6 +148,7 @@
     <span>Decimales: <b>3</b></span>
     <span>Muestras: <b id="rec-val">0</b></span>
     <span>Modo acc: <b id="mode-val">—</b></span>
+    <span>Build: <b id="build-val">v3.1</b></span>
     <span class="pill" id="db-val">persistencia: —</span>
   </div>
 
@@ -162,6 +179,28 @@
   <details>
     <summary>Notas técnicas / qué cambió respecto a v1</summary>
     <div class="note">
+      <p><strong>Detector de pasos (v3).</strong> Cuenta <strong>máximos locales</strong> de la señal lineal:
+      un paso se registra en el instante en que la señal deja de subir, de modo que el valor del pico es
+      exacto. Para aceptar el siguiente paso sólo hace falta que la señal haya descendido por debajo del
+      <strong>70 % del pico anterior</strong> —no de un umbral absoluto—, así que un valle poco profundo
+      (cadencia rápida) no bloquea la detección. Umbral adaptativo = media + K·σ sobre los últimos ~1 s
+      (K ajustable) y periodo refractario de 200 ms (permite hasta ~3 pasos/s).</p>
+
+      <p><strong>Antes (v2) el detector se «atascaba»:</strong> exigía que la aceleración volviera por debajo del
+      55 % del umbral para rearmar. Al caminar rápido el valle nunca llegaba a ese nivel, el estado «activo»
+      se mantenía y el <em>timeout</em> de 1500 ms acababa contando un solo paso por segundo en vez de
+      varios: de ahí la sensación de «tiesura» y de pasos perdidos.</p>
+
+      <p><strong>Filtro de gravedad.</strong> La gravedad se estima con un EMA de <strong>α = 0,08</strong>
+      (antes 0,90). Con α alto la estimación de gravedad <em>persigue</em> al impacto y <strong>aplana el
+      pico</strong> del paso; con α bajo el pico pasa intacto. La primera muestra inicializa la estimación
+      para que no aparezca un transitorio de ~9,8 m/s² al arrancar (que dispararía un paso falso).
+      El α y la sensibilidad K son ajustables en vivo.</p>
+
+      <p><strong>Zancada.</strong> El pico de impacto se normaliza contra la media de los últimos 20 picos,
+      de modo que el rango «mínima/máxima» que se introduce equivale al recorrido habitual del usuario
+      y no depende de la ganancia del filtro ni de lo rápido que camine.</p>
+
       <p><strong>Precisión.</strong> Los valores se guardan internamente con precisión completa de <code>float</code>;
       la pantalla y el CSV los muestran con <strong>exactamente 3 decimales</strong> (v1 usaba 1 decimal).</p>
 
@@ -170,11 +209,10 @@
       se perdía en la tabla y en el CSV. Ahora se conserva la muestra de <strong>máxima magnitud lineal</strong> de
       cada ventana, mientras la <em>detección</em> de pasos sigue corriendo a la frecuencia nativa del sensor.</p>
 
-      <p><strong>Detector de pasos.</strong> Umbral adaptativo (media + 1.4·σ sobre los últimos ~1.5 s),
-      <strong>histéresis real</strong> (hay que bajar del 55 % del umbral para rearmar, no basta con que baje un
-      instante como en v1) y periodo refractario de 260 ms.</p>
+      <p><strong>Detector de pasos.</strong> Umbral adaptativo (media + K·σ sobre los últimos ~1 s),
+      <strong>rearmado por descenso</strong> respecto al pico anterior (70 %) y periodo refractario de 200 ms.</p>
 
-      <p><strong>Compensación de inclinación.</strong> Se estima la gravedad con un filtro de paso bajo (EMA α=0.90)
+      <p><strong>Compensación de inclinación.</strong> Se estima la gravedad con un filtro de paso bajo (EMA α=0,08)
       y se resta, de modo que el umbral ya no depende de cómo se sujeta el móvil.</p>
 
       <p><strong>Rumbo real.</strong> v1 usaba <code>alpha</code> de <code>deviceorientation</code>, que es
@@ -196,6 +234,13 @@
       pausa/reanudación con <code>visibilitychange</code>, estado completo reiniciado al parar y persistencia en
       IndexedDB para no perder la sesión al recargar.</p>
     </div>
+    <div class="note">
+      <p><strong>Build <span id="build-note">—</span>.</strong> El número de versión aparece en el título, en la barra
+      de estado y en la cabecera del CSV. GitHub Pages cachea el HTML: si subes un cambio y el móvil sigue
+      mostrando la versión anterior, es la caché, no tu push — recarga con <code>Ctrl+F5</code> (Android)
+      o vaciando la caché del navegador (iOS). La build se incrementa en la constante
+      <code>BUILD</code> al principio del script.</p>
+    </div>
   </details>
 </main>
 
@@ -205,12 +250,31 @@
 'use strict';
 
 /* ========================= CONFIGURACIÓN ========================= */
+const BUILD       = 'v3.1';   // marcador de versión: visible en pantalla, título y CSV
 const SAMPLE_MS   = 50;      // ventana del registro (ms)
 const DEC         = 3;       // decimales de salida
-const GRAV_ALPHA  = 0.90;    // LPF de gravedad
+// LPF de gravedad. Con α alto la estimación de gravedad "persigue" el impacto y
+// APLANA el pico del paso (a 2 Hz la atenuación con α=0.90 es casi nula).
+// Con α bajo el pico pasa intacto; el coste es una convergencia más lenta,
+// que se compensa inicializando la gravedad con la primera muestra.
+const GRAV_ALPHA  = 0.08;
 const DB_NAME     = 'pdr-log-v2';
 const ST_RECORDS  = 'records';
 const ST_STEPS    = 'steps';
+
+/**
+ * Detector de pasos: máximos locales con rearmado por DESCENSO relativo al pico
+ * anterior (no respecto al umbral), para que un valle poco profundo no bloquee
+ * la detección de pasos rápidos.
+ */
+const STEP_CFG = {
+  refractoryMs: 200,   // mínimo entre pasos  -> permite hasta ~3 pasos/s (180 ppm)
+  minDescent:  0.70,   // hay que bajar al 70 % del pico anterior para rearmar
+  minProm:     0.15,   // el pico debe destacar sobre el valle (fracción del umbral)
+  thrFloor:    0.80,   // umbral mínimo de detección (m/s²)
+  thrK:        1.00,   // umbral = media + K·σ
+  histLen:     60      // ventana del estadístico (~1 s a 60 Hz)
+};
 
 const $ = id => document.getElementById(id);
 const clamp = (v,a,b) => v < a ? a : (v > b ? b : v);
@@ -247,6 +311,9 @@ const S = {
   beta: 90, gamma: 0,                 // postura (Auto los actualiza desde el sensor)
   haveTilt: false,
   posture: 'auto', invertYaw: false,  // ajustes cacheados (no leer el DOM a 60 Hz)
+  gravAlpha: GRAV_ALPHA,             // α del filtro de gravedad (ajustable)
+  thrK: STEP_CFG.thrK,               // sensibilidad del umbral (ajustable)
+  refractoryMs: STEP_CFG.refractoryMs,
   compass: null,                      // rumbo del magnetómetro (grados)
   compassTrue: false,                 // ¿ya viene en norte verdadero? (iOS)
   compassWeight: 0,                   // peso de la corrección complementaria
@@ -261,16 +328,18 @@ const S = {
 
   // detector
   gravity: { x:0, y:0, z:0 },
+  gravityInit: false,
   linMag: 0,
   linX: 0, linY: 0, linZ: 0,
   hist: [],
-  stepActive: false,
-  stepPeak: 0,
-  stepPeakT: 0,
-  stepStartT: 0,
+  peak: 0,            // seguimiento del máximo local en curso
+  valley: Infinity,    // mínimo desde el último pico de referencia
+  lastPeak: null,     // último pico contado (para el rearmado por descenso)
+  descentOk: true,    // ¿la señal ya ha descendido lo suficiente?
+  peakHist: [],       // historial de picos (normalización adaptativa de la zancada)
   lastStepT: 0,
-  thrHigh: 1.2,
-  thrLow: 0.6,
+  thrHigh: 0.8,
+  thrLow: 0.56,
   accMode: 'none',
 
   // quiet / ZUPT
@@ -363,10 +432,13 @@ function stopListening() {
 /** Reinicia por completo el estado de sensado (no el historial). */
 function resetDetector() {
   S.gravity = { x:0, y:0, z:0 };
+  S.gravityInit = false;
   S.linMag = 0; S.linX = S.linY = S.linZ = 0;
   S.hist.length = 0;
-  S.stepActive = false; S.stepPeak = 0; S.stepPeakT = 0; S.stepStartT = 0;
-  S.lastStepT = 0; S.thrHigh = 1.2; S.thrLow = 0.6;
+  S.peakHist.length = 0;
+  S.peak = 0; S.valley = Infinity;
+  S.lastPeak = null; S.descentOk = true;
+  S.lastStepT = 0; S.thrHigh = STEP_CFG.thrFloor; S.thrLow = STEP_CFG.thrFloor * STEP_CFG.minDescent;
   S.quietSince = null;
   S.gyroBias = 0; S.gyroInit = false; S.gyroH = null;
   S.compass = null; S.compassTrue = false; S.compassWeight = 0;
@@ -437,9 +509,16 @@ function onMotion(e) {
   if (gA && (typeof gA.x === 'number' || typeof gA.y === 'number' || typeof gA.z === 'number')) {
     ax = num(gA.x); ay = num(gA.y); az = num(gA.z);
     const g = S.gravity;
-    g.x += GRAV_ALPHA * (ax - g.x);
-    g.y += GRAV_ALPHA * (ay - g.y);
-    g.z += GRAV_ALPHA * (az - g.z);
+    if (!S.gravityInit) {
+      // primera muestra: inicializar con el valor medido evita el transitorio
+      // de convergencia (que valdría ~9,8 m/s² y dispararía un paso falso)
+      g.x = ax; g.y = ay; g.z = az;
+      S.gravityInit = true;
+    } else {
+      g.x += S.gravAlpha * (ax - g.x);
+      g.y += S.gravAlpha * (ay - g.y);
+      g.z += S.gravAlpha * (az - g.z);
+    }
     lin = { x: ax - g.x, y: ay - g.y, z: az - g.z };
     mode = 'grav';
   } else {
@@ -509,7 +588,7 @@ function computeYawRate(wx, wy, wz) {
 function updateHeading(t, dt, yawRate) {
   if (S.gyroH === null) S.gyroH = 0;
 
-  // 1) integrar giroscopio (yaw positivo antihorario => el rumbouhrzeiger decreases)
+  // 1) integrar giroscopio (yaw positivo antihorario => el rumbo sentido horario disminuye)
   if (dt > 0) S.gyroH = (S.gyroH - (yawRate - S.gyroBias) * dt + 360) % 360;
 
   // 2) fusionar con el magnetómetro (corrección lenta)
@@ -573,37 +652,72 @@ function handleOrientation(e, absolute) {
 }
 
 /* ========================= DETECCIÓN DE PASOS ========================= */
-function detectStep(t, linMag) {
-  // umbral adaptativo sobre los últimos ~1.5 s
+/**
+ * Detector por MÁXIMOS LOCALES.
+ *
+ * Por qué no "umbral que se rearma al bajar por debajo de X":
+ *   - Si se exige bajar por debajo de un umbral absoluto, al caminar rápido el
+ *     valle nunca llega y el detector se queda bloqueado -> se pierden pasos.
+ *   - Si en cambio se rearma demasiado pronto (p. ej. al 80 % del umbral), un
+ *     mismo impacto se puede partir en dos -> pasos duplicados.
+ *
+ * La solución: el paso se cuenta en el MÁXIMO LOCAL (la señal deja de subir), y
+ * para aceptar el siguiente paso sólo hace falta que la señal haya descendido
+ * por debajo del 70 % del pico anterior. Es independiente de la profundidad
+ * del valle, así que no bloquea la cadencia rápida, y sigue impidiendo que un
+ * mismo impacto se cuente dos veces.
+ */
+function detectStep(t, v) {
+  // 1) umbral adaptativo sobre ~1 s de la señal lineal
   const hist = S.hist;
-  const thr = Math.max(1.2, avg(hist) + 1.4 * std(hist));
+  const thr = Math.max(STEP_CFG.thrFloor, avg(hist) + S.thrK * std(hist));
   S.thrHigh = thr;
-  S.thrLow  = thr * 0.55;
-  hist.push(linMag);
-  if (hist.length > 90) hist.shift();
+  hist.push(v);
+  if (hist.length > STEP_CFG.histLen) hist.shift();
 
-  if (!S.stepActive) {
-    if (linMag > S.thrHigh && (t - S.lastStepT) > 260) {
-      S.stepActive = true; S.stepPeak = linMag; S.stepPeakT = t; S.stepStartT = t;
-    }
+  // 2) seguimiento del pico/valle
+  if (v >= S.peak) { S.peak = v; return; }   // la señal sigue subiendo
+
+  // 3) la señal ha bajado -> puede ser el final de un impacto
+  const peak = S.peak;
+
+  // ¿ha descendido ya lo suficiente respecto al último pico contado?
+  if (S.lastPeak !== null && v < S.lastPeak * STEP_CFG.minDescent) S.descentOk = true;
+  S.thrLow = S.lastPeak !== null ? S.lastPeak * STEP_CFG.minDescent : thr;
+
+  const prominence = peak - S.valley;
+
+  if (peak >= thr &&
+      prominence >= thr * STEP_CFG.minProm &&
+      S.descentOk &&
+      (t - S.lastStepT) >= S.refractoryMs) {
+    finalizeStep(t, peak);
+    S.lastStepT = t;
+    S.lastPeak  = peak;      // el siguiente pico exige otro descenso
+    S.descentOk = false;
+    S.valley    = peak;      // nuevo valle de referencia
   } else {
-    if (linMag > S.stepPeak) { S.stepPeak = linMag; S.stepPeakT = t; }
-    // el paso se confirma cuando la señal vuelve a bajar (histéresis real)
-    if (linMag < S.thrLow || (t - S.stepStartT) > 1500) finalizeStep(t);
+    if (v < S.valley) S.valley = v;
   }
+  S.peak = v;
 }
 
-function finalizeStep(t) {
-  const peak = S.stepPeak;
-  S.stepActive = false;
-  S.lastStepT = t;
-
+function finalizeStep(t, peak) {
   const minS = clamp(parseFloat($('minStride').value) || 0.679, 0.2, 2.5);
   const maxS = clamp(parseFloat($('maxStride').value) || 0.981, 0.2, 2.5);
   const lo = Math.min(minS, maxS), hi = Math.max(minS, maxS);
 
-  const f = clamp((peak - 1.6) / (4.5 - 1.6), 0, 1);
+  // Normalización adaptativa del pico: el pico se compara con la media de los
+  // últimos picos, de modo que la zancada no dependa de la ganancia del filtro
+  // de gravedad ni del estilo de marcha (rápida/lenta) del usuario.
+  const ph = S.peakHist;
+  ph.push(peak);
+  if (ph.length > 20) ph.shift();
+  const pMean = avg(ph);
+  const pStd  = Math.max(std(ph), 0.25);
+  const f = clamp(0.5 + (peak - pMean) / (2 * pStd), 0, 1);
   const raw = lo + f * (hi - lo);
+
   const a = clamp(parseFloat($('emaAlpha').value) || 0.3, 0.05, 1);
   S.strideEMA = S.strideEMA * (1 - a) + raw * a;
   S.lastStride = S.strideEMA;
@@ -839,6 +953,7 @@ setInterval(() => {
     $('compass-sub').textContent = S.compassTrue ? 'norte verdadero' : 'norte magnético (+' + fmt(parseFloat($('declination').value) || 0, 1) + '°)';
   }
   $('quiet-sub').textContent = S.quietSince !== null ? 'quieto (ZUPT)' : 'en movimiento';
+  $('thr-val').textContent = fmt(S.thrHigh) + ' / ' + fmt(S.thrLow);
   $('conf-val').textContent = S.running ? Math.round(S.conf) + ' %' : '--';
   $('conf-sub').textContent = S.compass !== null ? 'giroscopio + magnetómetro' : 'solo giroscopio';
   // watchdog de inmovilidad
@@ -867,7 +982,8 @@ $('calibBtn').onclick = () => {
 function exportCSV() {
   if (!S.records.length) { toast('No hay datos que exportar'); return; }
   const head = [
-    '# Registro PDR v2',
+    '# Registro PDR ' + BUILD,
+    '# Build,' + BUILD,
     '# Inicio,' + (S.sessionStart || 'sesion'),
     '# Muestreo_ms,' + SAMPLE_MS,
     '# Decimales,' + DEC,
@@ -1016,10 +1132,28 @@ $('centerBtn').onclick = centerMap;
 $('autoFit').onchange = () => { if ($('autoFit').checked) { S.view.manual = false; S.view.zoom = 1; S.view.ox = 0; S.view.oy = 0; } drawMap(); };
 $('posture').onchange  = () => { S.posture = $('posture').value; toast('Postura: ' + $('posture').selectedOptions[0].text); };
 $('invertYaw').onchange = () => { S.invertYaw = $('invertYaw').checked; };
+$('gravAlpha').onchange = () => {
+  S.gravAlpha = clamp(parseFloat($('gravAlpha').value) || GRAV_ALPHA, 0.01, 0.5);
+  $('gravAlpha').value = S.gravAlpha;
+  toast('Filtro de gravedad α = ' + S.gravAlpha);
+};
+$('thrK').onchange = () => {
+  S.thrK = clamp(parseFloat($('thrK').value) || STEP_CFG.thrK, 0.3, 2.5);
+  $('thrK').value = S.thrK;
+  toast('Sensibilidad K = ' + S.thrK);
+};
+$('refractory').onchange = () => {
+  S.refractoryMs = clamp(parseFloat($('refractory').value) || STEP_CFG.refractoryMs, 120, 600);
+  $('refractory').value = S.refractoryMs;
+  toast('Refractario = ' + S.refractoryMs + ' ms');
+};
 window.addEventListener('resize', drawMap);
 window.addEventListener('beforeunload', () => { persistNow(); });
 
 /* ========================= ARRANQUE ========================= */
+$('build-val').textContent = BUILD;
+$('build-note').textContent = BUILD;
+$('app-title').textContent = 'Registro Unificado ' + BUILD + ' — Muestreo 50 ms · 3 decimales';
 drawMap();
 initDB().then(checkStored);
 </script>
